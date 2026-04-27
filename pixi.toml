@@ -1,0 +1,24 @@
+[workspace]
+name = "pycmdb"
+version = "0.1.0"
+description = "Git-based CMDB with change detection and local deployment"
+authors = ["CMDB Team"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = ">=3.10"
+pyyaml = "*"
+jsonschema = "*"
+jinja2 = "*"
+
+[tasks]
+detect = "python -m scripts.cli detect"
+validate = "python -m scripts.cli validate"
+deploy = "python -m scripts.cli deploy"
+
+[activation]
+scripts = ["/home/jwl/work/cmdb/scripts/setup_hooks.sh"]
+
+[target.linux-64.activation]
+scripts = ["/home/jwl/work/cmdb/scripts/setup_hooks.sh"]

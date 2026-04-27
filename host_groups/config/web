@@ -1,0 +1,7 @@
+name: web
+description: Web 服务器组
+members:
+  - web-01
+  - web-02
+variables:
+  nginx_version: "1.25.0"

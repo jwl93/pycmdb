@@ -1,0 +1,8 @@
+host_group:
+  - untagged
+ssh:
+  port: 22
+  user: root
+  key_file: ""
+labels: {}
+vars: {}

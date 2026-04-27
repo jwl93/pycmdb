@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""
+Git pre-commit hook - 本地提交前校验
+"""
+import sys
+import subprocess
+from pathlib import Path
+
+# 添加项目路径
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from scripts.detector import detect_changes, _parse_change
+from scripts.validator import validate_change
+
+
+def main():
+    # 只校验 staged 的变更
+    result = subprocess.run(
+        ["git", "diff", "--name-status", "--cached"],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print("[CMDB] git diff 失败")
+        return 1
+
+    if not result.stdout.strip():
+        return 0  # 没有变更，直接通过
+
+    # 解析变更
+    changes = []
+    for line in result.stdout.strip().split("\n"):
+        if not line:
+            continue
+        status, *paths = line.split("\t")
+        path = paths[0] if paths else ""
+
+        change = _parse_change(status, path)
+        if change:
+            changes.append(change)
+
+    # 校验每个变更
+    errors = []
+    for change in changes:
+        valid, errs = validate_change(change)
+        if not valid:
+            for err in errs:
+                errors.append(f"{change.config_type.value}/{change.name}: {err}")
+
+    if errors:
+        print("[CMDB] 校验失败:")
+        for err in errors:
+            print(f"  - {err}")
+        print("\n请修复后再提交，或使用 --no-verify 跳过校验（不推荐）")
+        return 1
+
+    print(f"[CMDB] 校验通过 ({len(changes)} 项)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

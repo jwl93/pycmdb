@@ -1,0 +1,131 @@
+"""
+CLI 入口 - cmdbctl 命令行工具
+"""
+import click
+from scripts.detector import detect_changes, get_config_content
+from scripts.validator import validate_change
+from scripts.executor import execute_changes, get_hook_path
+
+
+@click.group()
+def cli():
+    """Git-based CMDB - 本地变更检测与发布工具"""
+    pass
+
+
+@cli.command()
+@click.option("--base", default=None, help="基准 commit，默认为 HEAD")
+def detect(base):
+    """检测变更项，识别 new/delete/update 事件"""
+    changes = detect_changes(base)
+
+    if not changes:
+        click.echo("未检测到变更")
+        return
+
+    click.echo("\n检测到以下变更:")
+    click.echo("-" * 60)
+
+    for c in changes:
+        click.echo(f"  {c.config_type.value:12} {c.change_type.value:6}  {c.name}")
+
+    click.echo("-" * 60)
+    click.echo(f"共 {len(changes)} 项变更")
+
+
+@cli.command()
+@click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
+@click.option("--file", "name", help="按文件名过滤")
+@click.option("--preview", is_flag=True, help="预览模式，不执行")
+def deploy(config_type, name, preview):
+    """部署变更项"""
+    changes = detect_changes()
+
+    # 过滤
+    if config_type:
+        changes = [c for c in changes if c.config_type.value == config_type]
+    if name:
+        changes = [c for c in changes if c.name == name]
+
+    if not changes:
+        click.echo("没有可部署的变更")
+        return
+
+    click.echo("\n校验变更项...")
+    all_valid = True
+    for c in changes:
+        valid, errors = validate_change(c)
+        if not valid:
+            all_valid = False
+            click.echo(f"[ERROR] {c.config_type.value}/{c.name}:")
+            for err in errors:
+                click.echo(f"       - {err}")
+
+    if not all_valid:
+        click.echo("\n校验失败，请修复上述问题后再试")
+        return
+
+    click.echo("校验通过！")
+
+    # 执行
+    results = execute_changes(changes, dry_run=preview)
+
+    click.echo(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败")
+
+
+@cli.command()
+def validate():
+    """校验所有变更项的关联关系"""
+    changes = detect_changes()
+
+    if not changes:
+        click.echo("没有待校验的变更")
+        return
+
+    all_valid = True
+    for c in changes:
+        valid, errors = validate_change(c)
+        if valid:
+            click.echo(f"[OK] {c.config_type.value}/{c.name}")
+        else:
+            all_valid = False
+            click.echo(f"[FAIL] {c.config_type.value}/{c.name}:")
+            for err in errors:
+                click.echo(f"       - {err}")
+
+    if all_valid:
+        click.echo("\n所有校验通过！")
+    else:
+        click.echo("\n校验失败，请修复上述问题")
+
+
+@cli.command()
+@click.argument("change_type")
+@click.argument("name")
+def show_hook(change_type, name):
+    """显示指定类型的 hook 文件路径"""
+    from scripts.detector import ConfigType, ChangeType, Change
+
+    try:
+        ct = ConfigType(change_type)
+    except ValueError:
+        click.echo(f"未知类型: {change_type}")
+        return
+
+    # 构造一个假的 Change 对象来获取 hook 路径
+    fake_change = Change(
+        config_type=ct,
+        change_type=ChangeType.NEW,
+        name=name,
+    )
+    hook_path = get_hook_path(fake_change)
+    click.echo(f"Hook 路径: {hook_path}")
+    click.echo(f"存在: {hook_path.exists()}")
+
+
+def main():
+    cli()
+
+
+if __name__ == "__main__":
+    main()

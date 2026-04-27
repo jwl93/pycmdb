@@ -1,0 +1,9 @@
+[project]
+name = "cmdb"
+version = "0.1.0"
+description = "Git-based CMDB with change detection and local deployment"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

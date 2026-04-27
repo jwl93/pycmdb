@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "hosts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "host 或 host_group 名称"
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "start_time": { "type": "string", "format": "time" },
+        "end_time": { "type": "string", "format": "time" },
+        "publish_script": { "type": "string" },
+        "rollback_script": { "type": "string" }
+      }
+    },
+    "vars": { "type": "object" }
+  }
+}

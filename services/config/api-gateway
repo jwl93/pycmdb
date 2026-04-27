@@ -1,0 +1,11 @@
+name: api-gateway
+version: 1.2.0
+hosts:
+  - web-01
+  - web-02
+deployment:
+  start_time: "02:00"
+  end_time: "06:00"
+vars:
+  port: 8080
+  workers: 4
