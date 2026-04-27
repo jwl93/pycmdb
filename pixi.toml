@@ -11,6 +11,7 @@ python = ">=3.10"
 pyyaml = "*"
 jsonschema = "*"
 jinja2 = "*"
+gitpython = "*"
 
 [tasks]
 detect = "python -m scripts.cli detect"
