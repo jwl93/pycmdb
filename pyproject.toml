@@ -1,6 +1,6 @@
 [project]
 name = "cmdb"
-version = "0.1.0"
+version = "0.1.1"
 description = "Git-based CMDB with change detection and local deployment"
 requires-python = ">=3.10"
 
