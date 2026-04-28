@@ -25,7 +25,7 @@ def cli():
 
 @cli.command()
 @click.option("--base", default=None, help="基准 commit，默认为 HEAD")
-@click.option("--publish-type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
+@click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
 @click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
 def detect(base, config_type, targets):
     """检测变更项，识别 new/delete/update 事件"""
