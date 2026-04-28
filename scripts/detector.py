@@ -1,11 +1,12 @@
 """
 变更检测模块 - 分析 git diff，识别 NEW/DELETE/UPDATE 事件
 """
-import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Optional
+
+from git import Repo
 
 
 class ChangeType(str, Enum):
@@ -34,26 +35,59 @@ def detect_changes(base_commit: Optional[str] = None) -> list[Change]:
     """
     检测 git 变更，返回 Change 列表
     """
-    cmd = ["git", "diff", "--name-status"]
-    if base_commit:
-        cmd.append(base_commit)
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        return []
+    repo = Repo(".")
 
     changes = []
-    for line in result.stdout.strip().split("\n"):
-        if not line:
-            continue
-        status, *paths = line.split("\t")
-        path = paths[0] if paths else ""
 
-        change = _parse_change(status, path)
+    # Get diffs between index and specified base, or index vs HEAD when base_commit is None
+    if base_commit:
+        diffs = repo.index.diff(base_commit)
+    else:
+        diffs = repo.index.diff("HEAD")
+
+    for item in diffs:
+        change = _item_to_change(item)
+        if change:
+            changes.append(change)
+
+    # Get untracked files
+    for fname in repo.untracked_files:
+        change = _parse_porcelain_line(f"??\t{fname}")
         if change:
             changes.append(change)
 
     return changes
+
+
+def _item_to_change(item) -> Optional[Change]:
+    """
+    Convert GitPython Diff object to Change object
+    """
+    # Determine status from GitPython flags
+    if item.new_file:
+        status = "A"
+    elif item.deleted_file:
+        status = "D"
+    else:
+        status = "M"
+
+    path = item.a_path if item.deleted_file else item.b_path
+
+    return _parse_change(status, path)
+
+
+def _parse_porcelain_line(line: str) -> Optional[Change]:
+    """
+    Parse a line from git status --porcelain format
+    """
+    parts = line.split("\t")
+    if len(parts) < 2:
+        return None
+
+    status = parts[0]
+    path = parts[1]
+
+    return _parse_change(status, path)
 
 
 def _parse_change(status: str, path: str) -> Optional[Change]:

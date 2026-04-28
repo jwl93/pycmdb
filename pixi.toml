@@ -12,6 +12,7 @@ pyyaml = "*"
 jsonschema = "*"
 jinja2 = "*"
 gitpython = "*"
+click = "*"
 
 [tasks]
 detect = "python -m scripts.cli detect"
