@@ -34,27 +34,48 @@ class Change:
 def detect_changes(base_commit: Optional[str] = None) -> list[Change]:
     """
     检测 git 变更，返回 Change 列表
+
+    Uses commit-based diffs (comparing commits) rather than index diffs.
+    - If base_commit provided: compares base_commit..HEAD
+    - If no base_commit: compares HEAD~1..HEAD (last commit's changes)
+    - Untracked files (working tree only) are detected separately
     """
-    repo = Repo(".")
+    try:
+        repo = Repo(".")
+    except Exception:
+        return []
 
     changes = []
 
-    # Get diffs between index and specified base, or index vs HEAD when base_commit is None
+    # Determine the commit range based on base_commit
     if base_commit:
-        diffs = repo.index.diff(base_commit)
+        try:
+            # Verify base_commit is a valid commit
+            repo.commit(base_commit)
+            commit_range = f"{base_commit}..HEAD"
+        except Exception:
+            return []
     else:
-        diffs = repo.index.diff("HEAD")
+        commit_range = "HEAD~1..HEAD"
+
+    # Get diffs between commits using HEAD's diff method
+    try:
+        diffs = repo.head.commit.diff(commit_range)
+    except Exception:
+        return []
 
     for item in diffs:
         change = _item_to_change(item)
         if change:
             changes.append(change)
 
-    # Get untracked files
-    for fname in repo.untracked_files:
-        change = _parse_porcelain_line(f"??\t{fname}")
-        if change:
-            changes.append(change)
+    # For untracked files (working tree files not in git), use repo.untracked_files
+    # This only applies when detecting current uncommitted changes (base_commit is None)
+    if not base_commit:
+        for fname in repo.untracked_files:
+            change = _parse_porcelain_line(f"??\t{fname}")
+            if change:
+                changes.append(change)
 
     return changes
 
@@ -106,7 +127,8 @@ def _parse_change(status: str, path: str) -> Optional[Change]:
         change_type = ChangeType.DELETE
         old_path = Path(path)
         new_path = None
-    elif status == "A":
+    elif status == "A" or status == "??":
+        # "A" = added in diff, "??" = untracked file in git status
         change_type = ChangeType.NEW
         old_path = None
         new_path = Path(path)
