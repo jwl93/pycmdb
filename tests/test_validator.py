@@ -2,7 +2,7 @@
 import pytest
 from jsonschema import ValidationError
 
-from scripts.validator import validate_config, validate_references
+from scripts.validator import validate_config, validate_references, validate_business_rules
 from scripts.detector import ConfigType, Change, ChangeType
 
 
@@ -155,3 +155,69 @@ def test_validate_change_new(cmdb_root, monkeypatch, schema_dir, sample_host):
     valid, errors = validate_change(change)
     assert valid is True
     assert len(errors) == 0
+
+
+def test_business_rules_hostname_match(schema_dir, monkeypatch):
+    """Hostname matches filename, should pass."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    errors = validate_business_rules(ConfigType.HOSTS, "web-01", data)
+
+    assert errors == []
+
+
+def test_business_rules_hostname_mismatch(schema_dir, monkeypatch):
+    """Hostname does not match filename, should return error."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    errors = validate_business_rules(ConfigType.HOSTS, "web-02", data)
+
+    assert len(errors) == 1
+    assert "web-02" in errors[0]
+    assert "web-01" in errors[0]
+
+
+def test_business_rules_hostgroup_name_match(schema_dir, monkeypatch):
+    """host_group name matches filename, should pass."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"name": "web-servers", "members": ["web-01"]}
+    errors = validate_business_rules(ConfigType.HOST_GROUPS, "web-servers", data)
+
+    assert errors == []
+
+
+def test_business_rules_hostgroup_name_mismatch(schema_dir, monkeypatch):
+    """host_group name does not match filename, should return error."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"name": "web-servers", "members": ["web-01"]}
+    errors = validate_business_rules(ConfigType.HOST_GROUPS, "db-servers", data)
+
+    assert len(errors) == 1
+    assert "db-servers" in errors[0]
+    assert "web-servers" in errors[0]
+
+
+def test_business_rules_service_name_match(schema_dir, monkeypatch):
+    """Service name matches filename, should pass."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"name": "api-gateway", "version": "1.0.0"}
+    errors = validate_business_rules(ConfigType.SERVICES, "api-gateway", data)
+
+    assert errors == []
+
+
+def test_business_rules_service_name_mismatch(schema_dir, monkeypatch):
+    """Service name does not match filename, should return error."""
+    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
+
+    data = {"name": "api-gateway", "version": "1.0.0"}
+    errors = validate_business_rules(ConfigType.SERVICES, "gateway", data)
+
+    assert len(errors) == 1
+    assert "gateway" in errors[0]
+    assert "api-gateway" in errors[0]

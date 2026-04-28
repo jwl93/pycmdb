@@ -108,6 +108,34 @@ def _resolve_ref(ref: str) -> Optional[Path]:
     return None
 
 
+def validate_business_rules(config_type: ConfigType, name: str, data: dict) -> list[str]:
+    """
+    业务规则校验
+    返回错误列表，空列表表示校验通过
+    """
+    errors = []
+
+    if not data:
+        return errors
+
+    if config_type == ConfigType.HOSTS:
+        hostname = data.get("hostname", "")
+        if hostname and name != hostname:
+            errors.append(f"文件名 {name} 与 hostname {hostname} 不匹配")
+
+    elif config_type == ConfigType.HOST_GROUPS:
+        group_name = data.get("name", "")
+        if group_name and name != group_name:
+            errors.append(f"文件名 {name} 与 name {group_name} 不匹配")
+
+    elif config_type == ConfigType.SERVICES:
+        svc_name = data.get("name", "")
+        if svc_name and name != svc_name:
+            errors.append(f"文件名 {name} 与 name {svc_name} 不匹配")
+
+    return errors
+
+
 def validate_change(change: Change) -> tuple[bool, list[str]]:
     """
     对单个变更进行全面校验
@@ -121,23 +149,18 @@ def validate_change(change: Change) -> tuple[bool, list[str]]:
 
     # 根据变更类型校验
     if change.change_type == ChangeType.DELETE:
-        # 删除操作只需校验引用的引用
-        pass  # 可扩展
+        pass  # 删除操作只需校验引用的引用，可扩展
 
-    elif change.change_type == ChangeType.NEW:
+    elif change.change_type in (ChangeType.NEW, ChangeType.UPDATE):
         try:
             validate_config(change.config_type, change.name, new_data)
         except jsonschema.ValidationError as e:
             errors.append(f"Schema 校验失败: {e.message}")
+
         refs_errors = validate_references(change, new_data)
         errors.extend(refs_errors)
 
-    elif change.change_type == ChangeType.UPDATE:
-        try:
-            validate_config(change.config_type, change.name, new_data)
-        except jsonschema.ValidationError as e:
-            errors.append(f"Schema 校验失败: {e.message}")
-        refs_errors = validate_references(change, new_data)
-        errors.extend(refs_errors)
+        business_errors = validate_business_rules(change.config_type, change.name, new_data)
+        errors.extend(business_errors)
 
     return len(errors) == 0, errors
