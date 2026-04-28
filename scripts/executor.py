@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from scripts import get_cmdb_root
 from scripts.detector import Change, ChangeType, ConfigType
 
 
@@ -18,7 +19,7 @@ def get_hook_name(change: Change) -> str:
 
 def get_hook_path(change: Change) -> Path:
     """获取 hook 文件路径"""
-    return Path("hooks") / get_hook_name(change)
+    return get_cmdb_root() / "hooks" / get_hook_name(change)
 
 
 def load_hook(change: Change):
