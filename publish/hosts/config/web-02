@@ -2,7 +2,6 @@ hostname: web-02
 ip: 10.0.1.2
 host_group:
   - web
-  - prod
 ssh:
   port: 22
   user: deploy
