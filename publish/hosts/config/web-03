@@ -1,0 +1,10 @@
+hostname: web-03
+ip: 10.0.1.2
+ssh:
+  port: 22
+  user: deploy
+labels:
+  environment: production
+  role: webserver
+vars:
+  nginx_version: "1.25.0"
