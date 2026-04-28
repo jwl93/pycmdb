@@ -7,6 +7,16 @@ from scripts.validator import validate_change
 from scripts.executor import execute_changes, get_hook_path
 
 
+def filter_changes(changes, config_type=None, targets=None):
+    """根据 config_type 和 targets 过滤变更"""
+    if config_type:
+        changes = [c for c in changes if c.config_type.value == config_type]
+    if targets:
+        target_list = [t.strip() for t in targets.split(",")]
+        changes = [c for c in changes if c.name in target_list]
+    return changes
+
+
 @click.group()
 def cli():
     """Git-based CMDB - 本地变更检测与发布工具"""
@@ -15,9 +25,12 @@ def cli():
 
 @cli.command()
 @click.option("--base", default=None, help="基准 commit，默认为 HEAD")
-def detect(base):
+@click.option("--publish-type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
+@click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
+def detect(base, config_type, targets):
     """检测变更项，识别 new/delete/update 事件"""
     changes = detect_changes(base)
+    changes = filter_changes(changes, config_type, targets)
 
     if not changes:
         click.echo("未检测到变更")
@@ -35,17 +48,12 @@ def detect(base):
 
 @cli.command()
 @click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
-@click.option("--file", "name", help="按文件名过滤")
+@click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
 @click.option("--preview", is_flag=True, help="预览模式，不执行")
-def deploy(config_type, name, preview):
+def deploy(config_type, targets, preview):
     """部署变更项"""
     changes = detect_changes()
-
-    # 过滤
-    if config_type:
-        changes = [c for c in changes if c.config_type.value == config_type]
-    if name:
-        changes = [c for c in changes if c.name == name]
+    changes = filter_changes(changes, config_type, targets)
 
     if not changes:
         click.echo("没有可部署的变更")
@@ -74,9 +82,12 @@ def deploy(config_type, name, preview):
 
 
 @cli.command()
-def validate():
+@click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
+@click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
+def validate(config_type, targets):
     """校验所有变更项的关联关系"""
     changes = detect_changes()
+    changes = filter_changes(changes, config_type, targets)
 
     if not changes:
         click.echo("没有待校验的变更")
