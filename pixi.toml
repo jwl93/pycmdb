@@ -20,7 +20,7 @@ validate = "python -m scripts.cli validate"
 deploy = "python -m scripts.cli deploy"
 
 [activation]
-scripts = ["/home/jwl/work/cmdb/scripts/setup_hooks.sh"]
+scripts = ["scripts/setup_hooks.sh"]
 
 [target.linux-64.activation]
-scripts = ["/home/jwl/work/cmdb/scripts/setup_hooks.sh"]
+scripts = ["scripts/setup_hooks.sh"]
