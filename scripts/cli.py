@@ -17,7 +17,7 @@ def filter_changes(changes, config_type=None, targets=None):
     return changes
 
 
-@click.group()
+@click.group(context_settings=dict(help_option_names=["-h", "--help"]))
 def cli():
     """Git-based CMDB - 本地变更检测与发布工具"""
     pass
