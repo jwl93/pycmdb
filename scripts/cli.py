@@ -71,13 +71,25 @@ def deploy(config_type, targets, preview):
         click.echo("没有可部署的变更")
         return
 
-    click.echo("\n校验变更项...")
+    click.echo("\n检测到以下变更:")
+    click.echo("-" * 60)
+
+    for c in changes:
+        colored_type = color_change_type(c.change_type)
+        click.echo(f"  {c.config_type.value:12} {colored_type}  {c.name}")
+
+    click.echo("-" * 60)
+    click.echo(f"共 {len(changes)} 项变更\n")
+
+    click.echo("校验变更项...")
     all_valid = True
     for c in changes:
         valid, errors = validate_change(c)
-        if not valid:
+        if valid:
+            click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
+        else:
             all_valid = False
-            click.echo(click.style(f"[ERROR] {c.config_type.value}/{c.name}:", fg="red"))
+            click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
             for err in errors:
                 click.echo(f"       - {err}")
 
@@ -85,7 +97,7 @@ def deploy(config_type, targets, preview):
         click.echo(click.style("\n校验失败，请修复上述问题后再试", fg="red"))
         return
 
-    click.echo("校验通过！")
+    click.echo(click.style("校验通过！", fg="green"))
 
     # 确认执行
     if not preview:
