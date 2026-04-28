@@ -77,15 +77,15 @@ def deploy(config_type, targets, preview):
         valid, errors = validate_change(c)
         if not valid:
             all_valid = False
-            click.echo(f"[ERROR] {c.config_type.value}/{c.name}:")
+            click.echo(click.style(f"[ERROR] {c.config_type.value}/{c.name}:", fg="red"))
             for err in errors:
                 click.echo(f"       - {err}")
 
     if not all_valid:
-        click.echo("\n校验失败，请修复上述问题后再试")
+        click.echo(click.style("\n校验失败，请修复上述问题后再试", fg="red"))
         return
 
-    click.echo("校验通过！")
+    click.echo(click.style("校验通过！", fg="green"))
 
     # 执行
     results = execute_changes(changes, dry_run=preview)
@@ -109,17 +109,17 @@ def validate(config_type, targets):
     for c in changes:
         valid, errors = validate_change(c)
         if valid:
-            click.echo(f"[OK] {c.config_type.value}/{c.name}")
+            click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
         else:
             all_valid = False
-            click.echo(f"[FAIL] {c.config_type.value}/{c.name}:")
+            click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
             for err in errors:
                 click.echo(f"       - {err}")
 
     if all_valid:
-        click.echo("\n所有校验通过！")
+        click.echo(click.style("\n所有校验通过！", fg="green"))
     else:
-        click.echo("\n校验失败，请修复上述问题")
+        click.echo(click.style("\n校验失败，请修复上述问题", fg="red"))
 
 
 @cli.command()
