@@ -2,7 +2,7 @@
 CLI 入口 - cmdbctl 命令行工具
 """
 import click
-from scripts.detector import detect_changes, get_config_content
+from scripts.detector import detect_changes, get_config_content, ChangeType
 from scripts.validator import validate_change
 from scripts.executor import execute_changes, get_hook_path
 
@@ -15,6 +15,17 @@ def filter_changes(changes, config_type=None, targets=None):
         target_list = [t.strip() for t in targets.split(",")]
         changes = [c for c in changes if c.name in target_list]
     return changes
+
+
+def color_change_type(change_type):
+    """根据变更类型返回带颜色的字符串"""
+    if change_type == ChangeType.NEW:
+        return click.style(f"{change_type.value:6}", fg="green")
+    elif change_type == ChangeType.DELETE:
+        return click.style(f"{change_type.value:6}", fg="red")
+    elif change_type == ChangeType.UPDATE:
+        return click.style(f"{change_type.value:6}", fg="yellow")
+    return change_type.value
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -40,7 +51,8 @@ def detect(base, config_type, targets):
     click.echo("-" * 60)
 
     for c in changes:
-        click.echo(f"  {c.config_type.value:12} {c.change_type.value:6}  {c.name}")
+        colored_type = color_change_type(c.change_type)
+        click.echo(f"  {c.config_type.value:12} {colored_type}  {c.name}")
 
     click.echo("-" * 60)
     click.echo(f"共 {len(changes)} 项变更")
