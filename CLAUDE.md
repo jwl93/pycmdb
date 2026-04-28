@@ -19,11 +19,23 @@ pixi install
 # 检测变更
 pixi run detect
 
+# 按类型过滤检测 (hosts/host_groups/services)
+pixi run detect --publish-type hosts
+
+# 指定目标文件检测
+pixi run detect --targets web-01,web-02
+
 # 校验变更
 pixi run validate
 
 # 部署变更
 pixi run deploy
+
+# 按类型部署
+pixi run deploy --publish-type services
+
+# 指定目标部署
+pixi run deploy --targets api-gateway
 ```
 
 ## 目录结构
