@@ -79,3 +79,19 @@ pycmdb/
 - `hooks/{type}_delete.py` - 删除配置
 
 Git pre-commit hook 位于 `hooks/pre-commit`，通过 `scripts/setup_hooks.py` 安装。
+
+## 业务校验规则
+
+配置校验除了 JSON Schema 验证外，还有业务规则校验:
+
+| 配置类型 | 规则 | 错误信息示例 |
+|---------|------|-------------|
+| hosts | 文件名（无后缀）== hostname | `文件名 web-02 与 hostname web-01 不匹配` |
+| host_groups | 文件名（无后缀）== name | `文件名 db-servers 与 name web-servers 不匹配` |
+| services | 文件名（无后缀）== name | `文件名 gateway 与 name api-gateway 不匹配` |
+
+## 自动提交规则
+
+`pixi run deploy` 执行成功后，会自动将变更文件 git add 并 commit。
+
+commit 信息格式: `{新增|更新|删除} {hosts|host_groups|services}: {文件名}`
