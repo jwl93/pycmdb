@@ -25,7 +25,7 @@ def get_hook_path(change: Change) -> Path:
 
 def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
     """
-    将变更文件 git add 并 commit
+    将变更文件 git add, commit 并 push
     返回是否成功
     """
     from scripts.detector import get_config_content
@@ -60,9 +60,11 @@ def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
             capture_output=True,
             env={**subprocess.os.environ, "GIT_AUTHOR_NAME": "CMDB", "GIT_AUTHOR_EMAIL": "cmdb@local", "GIT_COMMITTER_NAME": "CMDB", "GIT_COMMITTER_EMAIL": "cmdb@local"}
         )
+        # git push
+        subprocess.run(["git", "push"], check=True, capture_output=True)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] git commit 失败: {e.stderr.decode() if e.stderr else e}")
+        print(f"[ERROR] git push 失败: {e.stderr.decode() if e.stderr else e}")
         return False
 
 
