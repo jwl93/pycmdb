@@ -2,6 +2,7 @@
 关联校验模块 - 检查 host_group 引用、hosts 引用等
 """
 import jsonschema
+from jsonschema import FormatChecker
 import yaml
 from pathlib import Path
 from typing import Optional
@@ -46,7 +47,7 @@ def validate_config(config_type: ConfigType, name: str, data: dict) -> dict:
     data = _merge_defaults(data, defaults)
 
     # JSON Schema 校验
-    jsonschema.validate(data, schema)
+    jsonschema.validate(data, schema, format_checker=FormatChecker())
 
     return data
 
@@ -83,8 +84,8 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
         # 检查 host_group 成员是否都存在
         members = data.get("members", [])
         for member in members:
-            host_path = get_cmdb_root() / "hosts" / "config" / member
-            group_path = get_cmdb_root() / "host_groups" / "config" / member
+            host_path = get_cmdb_root() / "hosts" / "config" / f"{member}.yaml"
+            group_path = get_cmdb_root() / "host_groups" / "config" / f"{member}.yaml"
             if not host_path.exists() and not group_path.exists():
                 errors.append(f"分组成员不存在: {member}")
 
@@ -95,12 +96,12 @@ def _resolve_ref(ref: str) -> Optional[Path]:
     """解析引用，返回配置路径（如果存在）"""
     root = get_cmdb_root()
     # 先当作 host 查找
-    host_path = root / "hosts" / "config" / ref
+    host_path = root / "hosts" / "config" / f"{ref}.yaml"
     if host_path.exists():
         return host_path
 
     # 再当作 host_group 查找
-    group_path = root / "host_groups" / "config" / ref
+    group_path = root / "host_groups" / "config" / f"{ref}.yaml"
     if group_path.exists():
         return group_path
 
