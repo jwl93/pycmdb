@@ -78,39 +78,6 @@ def test_validate_references_invalid(schema_dir, monkeypatch):
     assert "nonexistent-host" in errors[0]
 
 
-def test_validate_host_group_members_valid(schema_dir, monkeypatch, sample_host):
-    """All host_group members exist, should pass."""
-    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
-
-    change = Change(
-        config_type=ConfigType.HOST_GROUPS,
-        change_type=ChangeType.NEW,
-        name="web-servers"
-    )
-    data = {"name": "web-servers", "members": ["web-01"]}
-
-    errors = validate_references(change, data)
-
-    assert errors == []
-
-
-def test_validate_host_group_members_missing(schema_dir, monkeypatch):
-    """host_group member missing, should return error."""
-    monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
-
-    change = Change(
-        config_type=ConfigType.HOST_GROUPS,
-        change_type=ChangeType.NEW,
-        name="web-servers"
-    )
-    data = {"name": "web-servers", "members": ["nonexistent-host"]}
-
-    errors = validate_references(change, data)
-
-    assert len(errors) == 1
-    assert "nonexistent-host" in errors[0]
-
-
 def test_validate_services_references_valid(schema_dir, monkeypatch, sample_host, sample_host_group):
     """Service references existing hosts/groups, should pass."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))

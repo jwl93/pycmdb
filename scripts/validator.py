@@ -81,13 +81,9 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
                 errors.append(f"引用的 host/host_group 不存在: {ref}")
 
     elif change.config_type == ConfigType.HOST_GROUPS:
-        # 检查 host_group 成员是否都存在
-        members = data.get("members", [])
-        for member in members:
-            host_path = get_cmdb_root() / "publish" / "hosts" / "config" / member
-            group_path = get_cmdb_root() / "publish" / "host_groups" / "config" / member
-            if not host_path.exists() and not group_path.exists():
-                errors.append(f"分组成员不存在: {member}")
+        # host_groups 的 members 是动态从 hosts 的 host_group 字段计算的
+        # 这里只检查 host_group 配置文件本身存在即可
+        pass
 
     return errors
 
@@ -103,6 +99,32 @@ def _resolve_ref(ref: str) -> Optional[Path]:
             return path
 
     return None
+
+
+def get_hosts_in_group(group_name: str) -> list[str]:
+    """
+    动态获取指定主机组的所有主机
+    通过遍历所有 hosts 配置，根据 host_group 字段计算
+    """
+    root = get_cmdb_root()
+    hosts_dir = root / "publish" / "hosts" / "config"
+
+    if not hosts_dir.exists():
+        return []
+
+    hosts = []
+    for host_file in hosts_dir.iterdir():
+        if host_file.is_file():
+            try:
+                with open(host_file) as f:
+                    data = yaml.safe_load(f)
+                    host_groups = data.get("host_group", [])
+                    if group_name in host_groups:
+                        hosts.append(host_file.name)
+            except Exception:
+                continue
+
+    return hosts
 
 
 def validate_business_rules(config_type: ConfigType, name: str, data: dict) -> list[str]:
