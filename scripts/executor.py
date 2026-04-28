@@ -177,8 +177,8 @@ def execute_changes(changes: list[Change], dry_run: bool = False, auto_commit: b
 
         if success:
             results["success"] += 1
-            # hook 执行成功后自动 commit
-            if auto_commit and change.change_type != ChangeType.DELETE:
+            # hook 执行成功后自动 commit (包括 DELETE)
+            if auto_commit:
                 git_add_and_commit(change)
         else:
             results["failed"] += 1

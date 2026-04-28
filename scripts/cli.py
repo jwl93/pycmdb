@@ -108,7 +108,10 @@ def deploy(config_type, targets, preview):
     # 执行
     results = execute_changes(changes, dry_run=preview)
 
-    click.echo(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败")
+    if results["failed"] > 0:
+        click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="red"))
+    else:
+        click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="green"))
 
 
 @cli.command()
