@@ -30,31 +30,38 @@ pixi run deploy
 
 ```
 pycmdb/
-├── hosts/           # 主机配置 (config/*.yaml)
-│   ├── _schema.json # JSON Schema 验证
-│   └── _defaults.yaml
-├── host_groups/     # 主机组配置
-│   ├── _schema.json
-│   └── _defaults.yaml
-├── services/        # 服务配置
-│   ├── _schema.json
-│   └── _defaults.yaml
-├── scripts/         # CLI 核心代码
-│   ├── cli.py       # CLI 入口 (detect/validate/deploy 命令)
+├── publish/           # 用户可编辑的配置目录
+│   ├── hosts/        # 主机配置
+│   │   ├── config/   # 主机配置文件
+│   │   ├── _schema.json
+│   │   └── _defaults.yaml
+│   ├── host_groups/  # 主机组配置
+│   │   ├── config/
+│   │   ├── _schema.json
+│   │   └── _defaults.yaml
+│   └── services/     # 服务配置
+│       ├── config/
+│       ├── _schema.json
+│       └── _defaults.yaml
+├── scripts/          # CLI 核心代码
+│   ├── cli.py        # CLI 入口 (detect/validate/deploy 命令)
 │   ├── detector.py  # 变更检测
-│   ├── executor.py # 变更执行
-│   ├── validator.py # 配置校验
+│   ├── executor.py   # 变更执行
+│   ├── validator.py  # 配置校验
 │   └── setup_hooks.py
-├── hooks/           # Git hooks (pre-commit)
+├── hooks/            # Git hooks (pre-commit)
 │   ├── hosts_*.py
 │   ├── hostgroups_*.py
 │   └── services_*.py
-└── pixi.toml        # pixi 配置
+└── pixi.toml         # pixi 配置
 ```
 
 ## 配置类型
 
-每种配置类型 (hosts/host_groups/services) 都有:
+每种配置类型 (hosts/host_groups/services) 都在 `publish/` 目录下:
+- **config/**: 配置文件（无扩展名）
+- **_schema.json**: JSON Schema 验证规则
+- **_defaults.yaml**: 默认值
 - **config/*.yaml**: 配置文件
 - **_schema.json**: JSON Schema 验证规则
 - **_defaults.yaml**: 默认值

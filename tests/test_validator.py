@@ -144,12 +144,12 @@ def test_validate_change_new(cmdb_root, monkeypatch, schema_dir, sample_host):
         config_type=ConfigType.HOSTS,
         change_type=ChangeType.NEW,
         name="web-02",
-        new_path=cmdb_root / "hosts" / "config" / "web-02.yaml"
+        new_path=cmdb_root / "publish" / "hosts" / "config" / "web-02"
     )
 
     # Write the config file
-    (cmdb_root / "hosts" / "config" / "web-02.yaml").write_text(
-        "hostname: web-02\nip: 10.0.0.2\n"
+    (cmdb_root / "publish" / "hosts" / "config" / "web-02").write_text(
+        "hostname: web-02\nip:  10.0.0.2\n"
     )
 
     valid, errors = validate_change(change)

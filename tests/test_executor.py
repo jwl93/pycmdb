@@ -184,10 +184,11 @@ def run(context):
 ''')
 
     # Create config files
-    host_new = cmdb_root / "hosts" / "config" / "web-02.yaml"
+    host_new = cmdb_root / "publish" / "hosts" / "config" / "web-02"
+    host_new.parent.mkdir(parents=True, exist_ok=True)
     host_new.write_text("hostname: web-02\nip: 10.0.0.2\n")
 
-    host_existing = cmdb_root / "hosts" / "config" / "web-01.yaml"
+    host_existing = cmdb_root / "publish" / "hosts" / "config" / "web-01"
     host_existing.write_text("hostname: web-01\nip: 10.0.0.1\n")
 
     changes = [
@@ -244,7 +245,8 @@ def run(context):
 ''')
 
     # Create config file
-    host_new = cmdb_root / "hosts" / "config" / "web-03.yaml"
+    host_new = cmdb_root / "publish" / "hosts" / "config" / "web-03"
+    host_new.parent.mkdir(parents=True, exist_ok=True)
     host_new.write_text("hostname: web-03\nip: 10.0.0.3\n")
 
     change = Change(
