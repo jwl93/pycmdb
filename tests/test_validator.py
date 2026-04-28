@@ -129,3 +129,29 @@ def test_validate_services_references_valid(schema_dir, monkeypatch, sample_host
     errors = validate_references(change, data)
 
     assert errors == []
+
+
+def test_validate_change_new(cmdb_root, monkeypatch, schema_dir, sample_host):
+    """Test validate_change for NEW config type."""
+    import os
+    monkeypatch.setenv("CMDB_ROOT", str(cmdb_root))
+
+    from scripts.validator import validate_change
+    from scripts.detector import ConfigType, Change, ChangeType, get_config_content
+
+    # Create a change object for a new host
+    change = Change(
+        config_type=ConfigType.HOSTS,
+        change_type=ChangeType.NEW,
+        name="web-02",
+        new_path=cmdb_root / "hosts" / "config" / "web-02.yaml"
+    )
+
+    # Write the config file
+    (cmdb_root / "hosts" / "config" / "web-02.yaml").write_text(
+        "hostname: web-02\nip: 10.0.0.2\n"
+    )
+
+    valid, errors = validate_change(change)
+    assert valid is True
+    assert len(errors) == 0

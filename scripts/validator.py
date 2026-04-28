@@ -11,7 +11,7 @@ from scripts.detector import Change, ChangeType, ConfigType
 from scripts import get_cmdb_root
 
 
-class ValidationError(Exception):
+class CMDBValidationError(Exception):
     pass
 
 
