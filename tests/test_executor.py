@@ -8,6 +8,7 @@ from scripts.executor import (
     execute_hook,
     execute_changes,
     build_context,
+    git_add_and_commit,
 )
 from scripts.detector import Change, ChangeType, ConfigType
 
@@ -229,3 +230,41 @@ def test_build_context():
     assert context["name"] == "web-01"
     assert context["hostname"] == "web-01"
     assert "new" in context
+
+
+def test_execute_changes_with_auto_commit(cmdb_root, monkeypatch):
+    """execute_changes calls git_add_and_commit after successful hook execution."""
+    monkeypatch.setenv("CMDB_ROOT", str(cmdb_root))
+
+    # Create hook file
+    hook_file = cmdb_root / "hooks" / "hosts_new.py"
+    hook_file.write_text('''
+def run(context):
+    return True
+''')
+
+    # Create config file
+    host_new = cmdb_root / "hosts" / "config" / "web-03.yaml"
+    host_new.write_text("hostname: web-03\nip: 10.0.0.3\n")
+
+    change = Change(
+        config_type=ConfigType.HOSTS,
+        change_type=ChangeType.NEW,
+        name="web-03",
+        new_path=host_new,
+    )
+
+    # Track if git_add_and_commit was called
+    called = []
+    original_git_commit = __import__("scripts.executor", fromlist=["git_add_and_commit"]).git_add_and_commit
+
+    def mock_git_commit(*args, **kwargs):
+        called.append(True)
+        return True
+
+    monkeypatch.setattr("scripts.executor.git_add_and_commit", mock_git_commit)
+
+    results = execute_changes([change], dry_run=False, auto_commit=True)
+
+    assert results["success"] == 1
+    assert len(called) == 1  # git_add_and_commit was called

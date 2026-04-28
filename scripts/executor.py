@@ -2,6 +2,7 @@
 脚本执行器 - 调用对应的 hooks 脚本
 """
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,49 @@ def get_hook_name(change: Change) -> str:
 def get_hook_path(change: Change) -> Path:
     """获取 hook 文件路径"""
     return get_cmdb_root() / "hooks" / get_hook_name(change)
+
+
+def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
+    """
+    将变更文件 git add 并 commit
+    返回是否成功
+    """
+    from scripts.detector import get_config_content
+
+    _, new_data = get_config_content(change)
+
+    if change.change_type == ChangeType.DELETE:
+        path = change.old_path
+        file_list = [str(path)] if path else []
+    else:
+        path = change.new_path
+        file_list = [str(path)] if path else []
+
+    if not file_list:
+        return True
+
+    if message is None:
+        action = {
+            ChangeType.NEW: "新增",
+            ChangeType.UPDATE: "更新",
+            ChangeType.DELETE: "删除",
+        }.get(change.change_type, "变更")
+        message = f"{action} {change.config_type.value}: {change.name}"
+
+    try:
+        # git add
+        subprocess.run(["git", "add"] + file_list, check=True, capture_output=True)
+        # git commit
+        subprocess.run(
+            ["git", "commit", "-m", message],
+            check=True,
+            capture_output=True,
+            env={**subprocess.os.environ, "GIT_AUTHOR_NAME": "CMDB", "GIT_AUTHOR_EMAIL": "cmdb@local", "GIT_COMMITTER_NAME": "CMDB", "GIT_COMMITTER_EMAIL": "cmdb@local"}
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] git commit 失败: {e.stderr.decode() if e.stderr else e}")
+        return False
 
 
 def load_hook(change: Change):
@@ -103,7 +147,7 @@ def execute_hook(change: Change, old_data: Optional[dict], new_data: Optional[di
     return False
 
 
-def execute_changes(changes: list[Change], dry_run: bool = False) -> dict:
+def execute_changes(changes: list[Change], dry_run: bool = False, auto_commit: bool = True) -> dict:
     """
     执行一组变更
     返回执行结果统计
@@ -131,6 +175,9 @@ def execute_changes(changes: list[Change], dry_run: bool = False) -> dict:
 
         if success:
             results["success"] += 1
+            # hook 执行成功后自动 commit
+            if auto_commit and change.change_type != ChangeType.DELETE:
+                git_add_and_commit(change)
         else:
             results["failed"] += 1
 
