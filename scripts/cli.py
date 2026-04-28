@@ -85,7 +85,13 @@ def deploy(config_type, targets, preview):
         click.echo(click.style("\n校验失败，请修复上述问题后再试", fg="red"))
         return
 
-    click.echo(click.style("校验通过！", fg="green"))
+    click.echo("校验通过！")
+
+    # 确认执行
+    if not preview:
+        if not click.confirm("\n确认执行部署?"):
+            click.echo("已取消部署")
+            return
 
     # 执行
     results = execute_changes(changes, dry_run=preview)
