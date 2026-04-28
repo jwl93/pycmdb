@@ -126,8 +126,13 @@ def _parse_change(status: str, path: str) -> Optional[Change]:
     """
     解析 git diff --name-status 的单行输出
     """
-    # path 格式: hosts/config/web-01
+    # path 格式: hosts/config/web-01 或 hosts/_schema.json
     parts = path.split("/")
+
+    # 排除特殊文件（schema、defaults 等）
+    if len(parts) >= 2 and parts[-1].startswith("_"):
+        return None
+
     if len(parts) < 2 or parts[0] not in ("hosts", "host_groups", "services"):
         return None
 

@@ -84,8 +84,8 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
         # 检查 host_group 成员是否都存在
         members = data.get("members", [])
         for member in members:
-            host_path = get_cmdb_root() / "hosts" / "config" / f"{member}.yaml"
-            group_path = get_cmdb_root() / "host_groups" / "config" / f"{member}.yaml"
+            host_path = get_cmdb_root() / "hosts" / "config" / member
+            group_path = get_cmdb_root() / "host_groups" / "config" / member
             if not host_path.exists() and not group_path.exists():
                 errors.append(f"分组成员不存在: {member}")
 
@@ -95,15 +95,12 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
 def _resolve_ref(ref: str) -> Optional[Path]:
     """解析引用，返回配置路径（如果存在）"""
     root = get_cmdb_root()
-    # 先当作 host 查找
-    host_path = root / "hosts" / "config" / f"{ref}.yaml"
-    if host_path.exists():
-        return host_path
 
-    # 再当作 host_group 查找
-    group_path = root / "host_groups" / "config" / f"{ref}.yaml"
-    if group_path.exists():
-        return group_path
+    # Config files have no extension - try bare name first
+    for config_dir in ["hosts", "host_groups"]:
+        path = root / config_dir / "config" / ref
+        if path.exists():
+            return path
 
     return None
 

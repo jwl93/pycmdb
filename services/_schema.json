@@ -19,8 +19,8 @@
     "deployment": {
       "type": "object",
       "properties": {
-        "start_time": { "type": "string", "format": "time" },
-        "end_time": { "type": "string", "format": "time" },
+        "start_time": { "type": "string" },
+        "end_time": { "type": "string" },
         "publish_script": { "type": "string" },
         "rollback_script": { "type": "string" }
       }

@@ -32,20 +32,20 @@ def schema_dir(cmdb_root):
 @pytest.fixture
 def sample_host(schema_dir):
     """Create sample host config web-01."""
-    host_file = schema_dir / "hosts" / "config" / "web-01.yaml"
+    host_file = schema_dir / "hosts" / "config" / "web-01"
     host_file.write_text("hostname: web-01\nip: 10.0.0.1\n")
     return host_file
 
 @pytest.fixture
 def sample_host_group(schema_dir, sample_host):
     """Create sample host_group config web-servers."""
-    group_file = schema_dir / "host_groups" / "config" / "web-servers.yaml"
+    group_file = schema_dir / "host_groups" / "config" / "web-servers"
     group_file.write_text("name: web-servers\nmembers:\n  - web-01\n")
     return group_file
 
 @pytest.fixture
 def sample_service(schema_dir, sample_host):
     """Create sample service config api-gateway."""
-    svc_file = schema_dir / "services" / "config" / "api-gateway.yaml"
+    svc_file = schema_dir / "services" / "config" / "api-gateway"
     svc_file.write_text("name: api-gateway\nversion: 1.0.0\nhosts:\n  - web-01\n")
     return svc_file
