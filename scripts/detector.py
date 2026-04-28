@@ -36,10 +36,8 @@ def detect_changes(base_commit: Optional[str] = None) -> list[Change]:
     """
     检测 git 变更，返回 Change 列表
 
-    Uses commit-based diffs (comparing commits) rather than index diffs.
-    - If base_commit provided: compares base_commit..HEAD
-    - If no base_commit: compares HEAD~1..HEAD (last commit's changes)
-    - Untracked files (working tree only) are detected separately
+    - If base_commit provided: compares base_commit..HEAD (committed changes)
+    - If no base_commit: compares working tree to index (uncommitted + recently committed)
     """
     try:
         repo = Repo(".")
@@ -48,31 +46,41 @@ def detect_changes(base_commit: Optional[str] = None) -> list[Change]:
 
     changes = []
 
-    # Determine the commit range based on base_commit
     if base_commit:
+        # Compare base_commit to HEAD for committed changes
         try:
-            # Verify base_commit is a valid commit
             repo.commit(base_commit)
             commit_range = f"{base_commit}..HEAD"
+            diffs = repo.head.commit.diff(commit_range)
+            for item in diffs:
+                change = _item_to_change(item)
+                if change:
+                    changes.append(change)
         except Exception:
-            return []
+            pass
     else:
-        commit_range = "HEAD~1..HEAD"
+        # No base_commit: detect working tree changes
+        # Compare working tree to index (unstaged changes)
+        try:
+            diffs = repo.index.diff(None)  # None = compare working tree to index
+            for item in diffs:
+                change = _item_to_change(item)
+                if change:
+                    changes.append(change)
+        except Exception:
+            pass
 
-    # Get diffs between commits using HEAD's diff method
-    try:
-        diffs = repo.head.commit.diff(commit_range)
-    except Exception:
-        return []
+        # Also detect staged changes (in index but not in HEAD)
+        try:
+            diffs = repo.index.diff("HEAD")
+            for item in diffs:
+                change = _item_to_change(item)
+                if change:
+                    changes.append(change)
+        except Exception:
+            pass
 
-    for item in diffs:
-        change = _item_to_change(item)
-        if change:
-            changes.append(change)
-
-    # For untracked files (working tree files not in git), use repo.untracked_files
-    # This only applies when detecting current uncommitted changes (base_commit is None)
-    if not base_commit:
+        # Detect untracked files
         for fname in repo.untracked_files:
             change = _parse_porcelain_line(f"??\t{fname}")
             if change:
