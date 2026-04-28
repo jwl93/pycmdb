@@ -1,6 +1,7 @@
 """pytest fixtures and configuration"""
 import os
 import pytest
+import shutil
 from pathlib import Path
 
 @pytest.fixture
@@ -15,12 +16,10 @@ def cmdb_root(tmp_path):
 @pytest.fixture
 def schema_dir(cmdb_root):
     """Copy schema and defaults to temp root."""
-    import shutil
-
     # Copy schemas
     for config_type in ["hosts", "host_groups", "services"]:
-        src_schema = Path(f"../{config_type}/_schema.json")
-        src_defaults = Path(f"../{config_type}/_defaults.yaml")
+        src_schema = Path(__file__).parent.parent / config_type / "_schema.json"
+        src_defaults = Path(__file__).parent.parent / config_type / "_defaults.yaml"
         dst = cmdb_root / config_type
 
         if src_schema.exists():
