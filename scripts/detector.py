@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+import yaml
 from git import Repo
 
 
@@ -89,6 +90,8 @@ def _item_to_change(item) -> Optional[Change]:
         status = "A"
     elif item.deleted_file:
         status = "D"
+    elif item.renamed_file:
+        status = "R"
     else:
         status = "M"
 
@@ -150,8 +153,6 @@ def get_config_content(change: Change) -> tuple[Optional[dict], Optional[dict]]:
     """
     获取变更前后的配置内容
     """
-    import yaml
-
     old_content = None
     new_content = None
 
