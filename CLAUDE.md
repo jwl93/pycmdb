@@ -92,6 +92,6 @@ Git pre-commit hook 位于 `hooks/pre-commit`，通过 `scripts/setup_hooks.py` 
 
 ## 自动提交规则
 
-`pixi run deploy` 执行成功后，会自动将变更文件 git add 并 commit。
+`pixi run deploy` 执行成功后，会自动将变更文件 git add 并 commit，然后 push 到远程仓库。
 
 commit 信息格式: `{新增|更新|删除} {hosts|host_groups|services}: {文件名}`
