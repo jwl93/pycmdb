@@ -1,6 +1,7 @@
 """
 CLI 入口 - cmdbctl 命令行工具
 """
+import json
 import click
 from scripts.detector import detect_changes, scan_all_configs, get_config_content, ChangeType
 from scripts.validator import validate_change
@@ -26,6 +27,34 @@ def color_change_type(change_type):
     elif change_type == ChangeType.UPDATE:
         return click.style(f"{change_type.value:6}", fg="yellow")
     return change_type.value
+
+
+def format_json_output(changes: list, command: str) -> str:
+    """将变更列表格式化为 JSON 输出"""
+    result = {
+        "command": command,
+        "count": len(changes),
+        "changes": [
+            {
+                "config_type": c.config_type.value,
+                "change_type": c.change_type.value,
+                "name": c.name,
+            }
+            for c in changes
+        ]
+    }
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+def format_validate_json(results: list) -> str:
+    """将校验结果格式化为 JSON 输出"""
+    output = {
+        "command": "validate",
+        "total": len(results),
+        "valid": all(r["valid"] for r in results),
+        "results": results,
+    }
+    return json.dumps(output, indent=2, ensure_ascii=False)
 
 
 def format_deploy_preview(preview: dict) -> str:
@@ -61,13 +90,21 @@ def cli():
 @click.option("--base", default=None, help="基准 commit，默认为 HEAD")
 @click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
 @click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
-def detect(base, config_type, targets):
+@click.option("--json", "json_output", is_flag=True, help="JSON 格式输出")
+def detect(base, config_type, targets, json_output):
     """检测变更项，识别 new/delete/update 事件"""
     changes = detect_changes(base)
     changes = filter_changes(changes, config_type, targets)
 
     if not changes:
-        click.echo("未检测到变更")
+        if json_output:
+            click.echo(format_json_output([], "detect"))
+        else:
+            click.echo("未检测到变更")
+        return
+
+    if json_output:
+        click.echo(format_json_output(changes, "detect"))
         return
 
     click.echo("\n检测到以下变更:")
@@ -149,7 +186,8 @@ def deploy(config_type, targets, preview):
 @click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
 @click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
 @click.option("--all", "all_configs", is_flag=True, help="校验所有配置，不只是检测到的变更")
-def validate(config_type, targets, all_configs):
+@click.option("--json", "json_output", is_flag=True, help="JSON 格式输出")
+def validate(config_type, targets, all_configs, json_output):
     """校验所有变更项的关联关系"""
     if all_configs:
         changes = scan_all_configs()
@@ -158,19 +196,35 @@ def validate(config_type, targets, all_configs):
     changes = filter_changes(changes, config_type, targets)
 
     if not changes:
-        click.echo("没有待校验的变更")
+        if json_output:
+            click.echo(format_validate_json([]))
+        else:
+            click.echo("没有待校验的变更")
         return
 
     all_valid = True
+    validate_results = []
     for c in changes:
         valid, errors = validate_change(c)
+        validate_results.append({
+            "config_type": c.config_type.value,
+            "name": c.name,
+            "valid": valid,
+            "errors": errors,
+        })
         if valid:
-            click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
+            if not json_output:
+                click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
         else:
             all_valid = False
-            click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
-            for err in errors:
-                click.echo(f"       - {err}")
+            if not json_output:
+                click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
+                for err in errors:
+                    click.echo(f"       - {err}")
+
+    if json_output:
+        click.echo(format_validate_json(validate_results))
+        return
 
     if all_valid:
         click.echo(click.style("\n所有校验通过！", fg="green"))
