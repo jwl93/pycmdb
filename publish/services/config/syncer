@@ -1,0 +1,12 @@
+name: syncer
+version: 1.0.0
+type: syncer
+hosts:
+  - web-01
+  - web-02
+deployment:
+  src_host: db-master
+  src_path: /data/backup
+  dst_path: /data/synced
+vars:
+  sync_interval: 300
