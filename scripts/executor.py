@@ -119,6 +119,38 @@ def build_context(change: Change, old_data: Optional[dict], new_data: Optional[d
     return context
 
 
+def build_deploy_preview(change: Change) -> dict:
+    """
+    构建部署预览信息
+    返回 {'generic': {...}, 'type_specific': {...}}
+    """
+    from scripts.detector import get_config_content
+
+    _, new_data = get_config_content(change)
+
+    generic = {
+        'name': new_data.get('name'),
+        'version': new_data.get('version'),
+        'type': new_data.get('type'),
+        'hosts': new_data.get('hosts', []),
+    }
+
+    type_specific = {}
+    svc_type = new_data.get('type')
+
+    if svc_type == 'syncer':
+        deployment = new_data.get('deployment', {})
+        vars_data = new_data.get('vars', {})
+        type_specific = {
+            'src_host': deployment.get('src_host'),
+            'src_path': deployment.get('src_path'),
+            'dst_path': deployment.get('dst_path'),
+            'sync_interval': vars_data.get('sync_interval'),
+        }
+
+    return {'generic': generic, 'type_specific': type_specific}
+
+
 def execute_hook(change: Change, old_data: Optional[dict], new_data: Optional[dict], dry_run: bool = False) -> bool:
     """
     执行对应的 hook 脚本
