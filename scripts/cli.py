@@ -4,7 +4,7 @@ CLI 入口 - cmdbctl 命令行工具
 import click
 from scripts.detector import detect_changes, get_config_content, ChangeType
 from scripts.validator import validate_change
-from scripts.executor import execute_changes, get_hook_path
+from scripts.executor import execute_changes, get_hook_path, build_deploy_preview
 
 
 def filter_changes(changes, config_type=None, targets=None):
@@ -26,6 +26,29 @@ def color_change_type(change_type):
     elif change_type == ChangeType.UPDATE:
         return click.style(f"{change_type.value:6}", fg="yellow")
     return change_type.value
+
+
+def format_deploy_preview(preview: dict) -> str:
+    """格式化部署预览信息"""
+    lines = []
+    g = preview['generic']
+    ts = preview['type_specific']
+
+    lines.append("  服务: " + str(g['name']))
+    lines.append("  类型: " + str(g['type'] or 'N/A'))
+    if g['hosts']:
+        lines.append("  目标主机: " + ', '.join(g['hosts']))
+    else:
+        lines.append("  目标主机: 无")
+
+    if ts:
+        lines.append("  配置:")
+        for key, value in ts.items():
+            if value is not None:
+                display_key = key.replace('_', ' ')
+                lines.append(f"    {display_key}: {value}")
+
+    return '\n'.join(lines)
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -98,6 +121,14 @@ def deploy(config_type, targets, preview):
         return
 
     click.echo(click.style("校验通过！", fg="green"))
+
+    # 构建并显示部署预览
+    if changes:
+        preview_data = build_deploy_preview(changes[0])
+        click.echo("\n部署预览:")
+        click.echo("-" * 40)
+        click.echo(format_deploy_preview(preview_data))
+        click.echo("-" * 40)
 
     # 确认执行
     if not preview:
