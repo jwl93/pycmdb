@@ -2,10 +2,12 @@
 CLI 入口 - cmdbctl 命令行工具
 """
 import json
+import os
 import click
 from scripts.detector import detect_changes, scan_all_configs, get_config_content, ChangeType
 from scripts.validator import validate_change
 from scripts.executor import execute_changes, get_hook_path, build_deploy_preview
+from scripts.lock import DeployLock
 
 
 def filter_changes(changes, config_type=None, targets=None):
@@ -124,62 +126,69 @@ def detect(base, config_type, targets, json_output):
 @click.option("--preview", is_flag=True, help="预览模式，不执行")
 def deploy(config_type, targets, preview):
     """部署变更项"""
-    changes = detect_changes()
-    changes = filter_changes(changes, config_type, targets)
-
-    if not changes:
-        click.echo("没有可部署的变更")
-        return
-
-    click.echo("\n检测到以下变更:")
-    click.echo("-" * 60)
-
-    for c in changes:
-        colored_type = color_change_type(c.change_type)
-        click.echo(f"  {c.config_type.value:12} {colored_type}  {c.name}")
-
-    click.echo("-" * 60)
-    click.echo(f"共 {len(changes)} 项变更\n")
-
-    click.echo("校验变更项...")
-    all_valid = True
-    for c in changes:
-        valid, errors = validate_change(c)
-        if valid:
-            click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
-        else:
-            all_valid = False
-            click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
-            for err in errors:
-                click.echo(f"       - {err}")
-
-    if not all_valid:
-        click.echo(click.style("\n校验失败，请修复上述问题后再试", fg="red"))
-        return
-
-    click.echo(click.style("校验通过！", fg="green"))
-
-    # 构建并显示部署预览
-    if changes:
-        preview_data = build_deploy_preview(changes[0])
-        click.echo("\n部署预览:")
-        click.echo("-" * 40)
-        click.echo(format_deploy_preview(preview_data))
-        click.echo("-" * 40)
-
-    # 确认执行
-    if not preview:
-        if not click.confirm("\n确认执行部署?"):
-            click.echo("已取消部署")
+    # 获取部署锁
+    with DeployLock() as lock:
+        acquired, msg = lock.acquire()
+        if not acquired:
+            click.echo(click.style(f"\n[ERROR] {msg}", fg="red"))
             return
 
-    # 执行
-    results = execute_changes(changes, dry_run=preview)
+        changes = detect_changes()
+        changes = filter_changes(changes, config_type, targets)
 
-    if results["failed"] > 0:
-        click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="red"))
-    else:
-        click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="green"))
+        if not changes:
+            click.echo("没有可部署的变更")
+            return
+
+        click.echo("\n检测到以下变更:")
+        click.echo("-" * 60)
+
+        for c in changes:
+            colored_type = color_change_type(c.change_type)
+            click.echo(f"  {c.config_type.value:12} {colored_type}  {c.name}")
+
+        click.echo("-" * 60)
+        click.echo(f"共 {len(changes)} 项变更\n")
+
+        click.echo("校验变更项...")
+        all_valid = True
+        for c in changes:
+            valid, errors = validate_change(c)
+            if valid:
+                click.echo(click.style(f"[OK] {c.config_type.value}/{c.name}", fg="green"))
+            else:
+                all_valid = False
+                click.echo(click.style(f"[FAIL] {c.config_type.value}/{c.name}:", fg="red"))
+                for err in errors:
+                    click.echo(f"       - {err}")
+
+        if not all_valid:
+            click.echo(click.style("\n校验失败，请修复上述问题后再试", fg="red"))
+            return
+
+        click.echo(click.style("校验通过！", fg="green"))
+
+        # 构建并显示部署预览
+        if changes:
+            preview_data = build_deploy_preview(changes[0])
+            click.echo("\n部署预览:")
+            click.echo("-" * 40)
+            click.echo(format_deploy_preview(preview_data))
+            click.echo("-" * 40)
+
+        # 确认执行
+        if not preview:
+            if not click.confirm("\n确认执行部署?"):
+                click.echo("已取消部署")
+                return
+
+        # 执行
+        results = execute_changes(changes, dry_run=preview)
+
+        if results["failed"] > 0:
+            click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="red"))
+        else:
+            click.echo(click.style(f"\n执行完成: {results['success']} 成功, {results['failed']} 失败", fg="green"))
 
 
 @cli.command()
