@@ -2,7 +2,7 @@ name: syncer
 version: 1.0.0
 type: syncer
 hosts:
-  - web
+  - group:web
 deployment:
   src_host: db-master
   src_path: /data/backup
