@@ -1,5 +1,17 @@
 # pycmdb - Git-based CMDB
 
+## 项目目标
+
+**易用** - 让用户（运维人员和 AI Agent）能够轻松使用
+**安全** - 配置变更可追溯、可审计、可回滚
+
+### 设计原则
+
+1. **对运维人员**: 清晰的 CLI 输出、直观的配置格式、友好的错误提示
+2. **对 AI Agent**: 结构化的输出、确定性的行为、完整的上下文信息
+
+所有功能迭代都应围绕这两个目标和两类用户的需求进行权衡。
+
 ## 项目概述
 
 Git-based CMDB with change detection and local deployment. 使用 Git 作为配置管理数据库，通过文件变更检测实现配置变更追踪和发布。
@@ -20,19 +32,22 @@ pixi install
 pixi run detect
 
 # 按类型过滤检测 (hosts/host_groups/services)
-pixi run detect --publish-type hosts
+pixi run detect --type hosts
 
 # 指定目标文件检测
 pixi run detect --targets web-01,web-02
 
-# 校验变更
+# 校验变更（只校验检测到的变更）
 pixi run validate
+
+# 校验所有配置
+pixi run validate --all
 
 # 部署变更
 pixi run deploy
 
 # 按类型部署
-pixi run deploy --publish-type services
+pixi run deploy --type services
 
 # 指定目标部署
 pixi run deploy --targets api-gateway
@@ -82,6 +97,17 @@ pycmdb/
 
 - **hostname/name**: 小写字母开头，只含 `a-z0-9-`
 - **version**: 语义化版本 `x.y.z`
+
+### services.hosts 字段格式
+
+独立 host 直接写名称，host_group 使用 `group:` 前缀：
+
+```yaml
+hosts:
+  - web-01                    # 独立 host
+  - web-02                    # 独立 host
+  - group:web                 # host_group，会展开为所有成员
+```
 
 ## CLI 架构
 
