@@ -169,6 +169,35 @@ def _parse_change(status: str, path: str) -> Optional[Change]:
     )
 
 
+def scan_all_configs() -> list[Change]:
+    """
+    扫描 publish/ 目录下所有配置文件，返回 Change 列表
+    用于 --all 校验模式
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    changes = []
+
+    for config_type in ConfigType:
+        config_dir = root / "publish" / config_type.value / "config"
+        if not config_dir.exists():
+            continue
+
+        for config_file in config_dir.iterdir():
+            if config_file.is_file() and not config_file.name.startswith("_"):
+                change = Change(
+                    config_type=config_type,
+                    change_type=ChangeType.UPDATE,  # 已有配置，视为 UPDATE
+                    name=config_file.name,
+                    old_path=config_file,
+                    new_path=config_file,
+                )
+                changes.append(change)
+
+    return changes
+
+
 def get_config_content(change: Change) -> tuple[Optional[dict], Optional[dict]]:
     """
     获取变更前后的配置内容

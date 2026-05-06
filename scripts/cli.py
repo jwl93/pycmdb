@@ -2,7 +2,7 @@
 CLI 入口 - cmdbctl 命令行工具
 """
 import click
-from scripts.detector import detect_changes, get_config_content, ChangeType
+from scripts.detector import detect_changes, scan_all_configs, get_config_content, ChangeType
 from scripts.validator import validate_change
 from scripts.executor import execute_changes, get_hook_path, build_deploy_preview
 
@@ -148,9 +148,13 @@ def deploy(config_type, targets, preview):
 @cli.command()
 @click.option("--type", "config_type", help="按类型过滤 (hosts/host_groups/services)")
 @click.option("--targets", help="指定目标文件，逗号分隔 (如 web-01,web-02)")
-def validate(config_type, targets):
+@click.option("--all", "all_configs", is_flag=True, help="校验所有配置，不只是检测到的变更")
+def validate(config_type, targets, all_configs):
     """校验所有变更项的关联关系"""
-    changes = detect_changes()
+    if all_configs:
+        changes = scan_all_configs()
+    else:
+        changes = detect_changes()
     changes = filter_changes(changes, config_type, targets)
 
     if not changes:
