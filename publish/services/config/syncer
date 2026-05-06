@@ -2,8 +2,7 @@ name: syncer
 version: 1.0.0
 type: syncer
 hosts:
-  - web-01
-  - web-02
+  - web
 deployment:
   src_host: db-master
   src_path: /data/backup
