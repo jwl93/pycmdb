@@ -65,10 +65,9 @@ labels:
 # publish/host_groups/config/web-servers
 name: web-servers
 description: Web 服务器组
-members:
-  - web-01
-  - web-02
 ```
+
+**注意:** 主机组成员是动态计算的，不需要 `members` 字段。系统会遍历所有 hosts 配置，根据 `host_group` 字段自动计算每个组包含哪些主机。
 
 ### services - 服务配置
 
@@ -168,8 +167,8 @@ def run(context):
 **host_groups:**
 - `name` - 文件名（无后缀）
 - `group_name` - 组名
-- `members` - 成员列表
 - `new` / `old` - 完整配置
+- 注意: 组成员是动态从 hosts 的 `host_group` 字段计算的
 
 **services:**
 - `name` - 文件名（无后缀）
