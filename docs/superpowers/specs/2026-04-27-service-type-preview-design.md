@@ -14,6 +14,10 @@
 - 服务类型 (type)
 - 部署目标 (hosts)
 
+**hosts 字段格式:**
+- 独立 host: 裸名称，如 `web-01`、`web-02`
+- host_group: `group:` 前缀，如 `group:web`（会被展开为实际主机列表）
+
 **Service-type 特定部分:**
 - 根据 `type` 字段动态提取相关配置字段
 - 使用 `deployment` 和 `vars` 中的字段，按 type 定义展示
