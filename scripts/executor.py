@@ -119,6 +119,28 @@ def build_context(change: Change, old_data: Optional[dict], new_data: Optional[d
     return context
 
 
+def _expand_hosts(hosts_refs: list[str]) -> list[str]:
+    """
+    展开 host_group 引用为实际主机列表
+    """
+    from scripts.validator import get_hosts_in_group
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    expanded = []
+
+    for ref in hosts_refs:
+        host_group_path = root / "publish" / "host_groups" / "config" / ref
+        if host_group_path.exists():
+            # 是 host_group，展开
+            expanded.extend(get_hosts_in_group(ref))
+        else:
+            # 是独立 host
+            expanded.append(ref)
+
+    return expanded
+
+
 def build_deploy_preview(change: Change) -> dict:
     """
     构建部署预览信息
@@ -128,11 +150,14 @@ def build_deploy_preview(change: Change) -> dict:
 
     _, new_data = get_config_content(change)
 
+    hosts_refs = new_data.get('hosts', [])
+    expanded_hosts = _expand_hosts(hosts_refs)
+
     generic = {
         'name': new_data.get('name'),
         'version': new_data.get('version'),
         'type': new_data.get('type'),
-        'hosts': new_data.get('hosts', []),
+        'hosts': expanded_hosts,
     }
 
     type_specific = {}
