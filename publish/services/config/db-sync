@@ -1,0 +1,11 @@
+name: db-sync
+version: 1.0.0
+type: syncer
+hosts:
+  - web
+deployment:
+  src_host: db-master
+  src_path: /data/mysql
+  dst_path: /data/mysql-replica
+vars:
+  sync_interval: 600
