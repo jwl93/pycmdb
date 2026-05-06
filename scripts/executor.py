@@ -122,6 +122,8 @@ def build_context(change: Change, old_data: Optional[dict], new_data: Optional[d
 def _expand_hosts(hosts_refs: list[str]) -> list[str]:
     """
     展开 host_group 引用为实际主机列表
+    group: 前缀表示 host_group 引用，会被展开
+    裸名称表示独立 host，直接保留
     """
     from scripts.validator import get_hosts_in_group
     from scripts import get_cmdb_root
@@ -130,12 +132,12 @@ def _expand_hosts(hosts_refs: list[str]) -> list[str]:
     expanded = []
 
     for ref in hosts_refs:
-        host_group_path = root / "publish" / "host_groups" / "config" / ref
-        if host_group_path.exists():
-            # 是 host_group，展开
-            expanded.extend(get_hosts_in_group(ref))
+        if ref.startswith("group:"):
+            # host_group 引用，展开
+            group_name = ref[6:]  # 去掉 "group:" 前缀
+            expanded.extend(get_hosts_in_group(group_name))
         else:
-            # 是独立 host
+            # 独立 host
             expanded.append(ref)
 
     return expanded

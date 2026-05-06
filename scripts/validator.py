@@ -92,7 +92,15 @@ def _resolve_ref(ref: str) -> Optional[Path]:
     """解析引用，返回配置路径（如果存在）"""
     root = get_cmdb_root()
 
-    # Config files have no extension - try bare name first
+    # group: 前缀表示 host_group 引用
+    if ref.startswith("group:"):
+        group_name = ref[6:]
+        path = root / "publish" / "host_groups" / "config" / group_name
+        if path.exists():
+            return path
+        return None
+
+    # 裸名称在 hosts 和 host_groups 中查找
     for config_dir in ["publish/hosts", "publish/host_groups"]:
         path = root / config_dir / "config" / ref
         if path.exists():
