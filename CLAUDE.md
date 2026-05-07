@@ -40,6 +40,9 @@ Git-based CMDB with change detection and local deployment. 使用 Git 作为配�
 # 安装依赖
 pixi install
 
+# Web 界面（浏览器访问 http://localhost:5000）
+pixi run web
+
 # 检测变更
 pixi run detect
 
