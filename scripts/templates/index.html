@@ -16,9 +16,29 @@
             color: #333;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             padding: 20px;
+        }
+        .split-layout {
+            display: flex;
+            gap: 20px;
+        }
+        .main-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .logs-panel {
+            flex: 1;
+            min-width: 300px;
+        }
+        .logs-panel .card {
+            height: 100%;
+        }
+        .logs-panel .card-body {
+            height: calc(100% - 50px);
         }
         header {
             background: #2c3e50;
@@ -363,49 +383,55 @@
 
         <!-- 变更管理 Tab -->
         <div id="tab-changes" class="tab-content active">
-            <div class="card">
-                <div class="card-header">
-                    <span><span class="status-dot green"></span>检测到的变更</span>
-                    <button class="btn btn-primary" onclick="refreshChanges()">🔄 刷新</button>
-                </div>
-                <div class="card-body">
-                    <div id="changes-container">
-                        <div class="empty-state">加载中...</div>
+            <div class="split-layout">
+                <div class="main-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <span><span class="status-dot green"></span>检测到的变更</span>
+                            <button class="btn btn-primary" onclick="refreshChanges()">🔄 刷新</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="changes-container">
+                                <div class="empty-state">加载中...</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <span>操作</span>
-                </div>
-                <div class="card-body">
-                    <div class="filter-group">
-                        <select id="filter-type">
-                            <option value="">全部类型</option>
-                            <option value="hosts">主机</option>
-                            <option value="host_groups">主机组</option>
-                            <option value="services">服务</option>
-                        </select>
-                        <input type="text" id="filter-targets" placeholder="目标（逗号分隔，如 web-01,web-02）">
+                    <div class="card">
+                        <div class="card-header">
+                            <span>操作</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="filter-group">
+                                <select id="filter-type">
+                                    <option value="">全部类型</option>
+                                    <option value="hosts">主机</option>
+                                    <option value="host_groups">主机组</option>
+                                    <option value="services">服务</option>
+                                </select>
+                                <input type="text" id="filter-targets" placeholder="目标（逗号分隔，如 web-01,web-02）">
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="validateChanges()">✅ 校验变更</button>
+                                <button class="btn btn-primary" onclick="validateAll()">✅ 校验全部</button>
+                                <button class="btn btn-success" onclick="deployChanges()">🚀 部署变更</button>
+                                <button class="btn btn-success" onclick="deployAll()">🚀 部署全部</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" onclick="validateChanges()">✅ 校验变更</button>
-                        <button class="btn btn-primary" onclick="validateAll()">✅ 校验全部</button>
-                        <button class="btn btn-success" onclick="deployChanges()">🚀 部署变更</button>
-                        <button class="btn btn-success" onclick="deployAll()">🚀 部署全部</button>
-                    </div>
                 </div>
-            </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <span>操作日志</span>
-                    <button class="btn btn-primary" onclick="clearLogs()" style="padding: 5px 10px; font-size: 12px;">清空</button>
-                </div>
-                <div class="card-body">
-                    <div class="log-container" id="log-container">
-                        <div class="empty-state">暂无日志</div>
+                <div class="logs-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <span>操作日志</span>
+                            <button class="btn btn-primary" onclick="clearLogs()" style="padding: 5px 10px; font-size: 12px;">清空</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="log-container" id="log-container">
+                                <div class="empty-state">暂无日志</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
