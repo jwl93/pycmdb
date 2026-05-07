@@ -155,6 +155,21 @@ def api_deploy():
         # 执行 hooks 并自动 git commit/push
         results = execute_changes(changes, dry_run=False)
 
+        # 记录详细日志
+        for log in results.get("logs", []):
+            if log.startswith("[OK]"):
+                add_log("INFO", log)
+            elif log.startswith("[FAIL]"):
+                add_log("ERROR", log)
+            elif log.startswith("[ERROR]"):
+                add_log("ERROR", log)
+            elif log.startswith("[COMMIT]"):
+                add_log("INFO", log)
+            elif log.startswith("[SKIP]"):
+                add_log("WARN", log)
+            else:
+                add_log("INFO", log)
+
         if results["failed"] > 0:
             add_log("ERROR", f"部署完成: {results['success']} 成功, {results['failed']} 失败")
         else:

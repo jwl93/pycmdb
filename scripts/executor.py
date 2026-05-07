@@ -221,25 +221,49 @@ def execute_changes(changes: list[Change], dry_run: bool = False, auto_commit: b
         "failed": 0,
         "skipped": 0,
         "details": [],
+        "logs": [],  # 详细执行日志
     }
 
     for change in changes:
         old_data, new_data = get_config_content(change)
-        success = execute_hook(change, old_data, new_data, dry_run=dry_run)
+        hook_path = get_hook_path(change)
 
-        results["details"].append({
+        change_info = {
             "name": change.name,
             "type": change.config_type.value,
             "event": change.change_type.value,
-            "success": success,
-        })
+            "hook": str(hook_path),
+            "success": None,
+            "message": "",
+        }
 
-        if success:
-            results["success"] += 1
-            # hook 执行成功后自动 commit (包括 DELETE)
-            if auto_commit:
-                git_add_and_commit(change)
+        if not hook_path.exists():
+            change_info["success"] = True
+            change_info["message"] = "跳过: 未找到 hook"
+            results["logs"].append(f"[SKIP] {change.config_type.value}/{change.name}: 未找到 hook")
+            results["skipped"] += 1
         else:
-            results["failed"] += 1
+            success = execute_hook(change, old_data, new_data, dry_run=dry_run)
+            change_info["success"] = success
+
+            if success:
+                results["logs"].append(f"[OK] {change.config_type.value}/{change.name} ({change.change_type.value})")
+                # hook 执行成功后自动 commit (包括 DELETE)
+                if auto_commit:
+                    if git_add_and_commit(change):
+                        results["logs"].append(f"[COMMIT] {change.config_type.value}/{change.name}: 已提交")
+                        change_info["message"] = "执行成功，已提交"
+                    else:
+                        results["logs"].append(f"[ERROR] {change.config_type.value}/{change.name}: git 提交失败")
+                        change_info["message"] = "执行成功，但 git 提交失败"
+                else:
+                    change_info["message"] = "执行成功"
+                results["success"] += 1
+            else:
+                results["logs"].append(f"[FAIL] {change.config_type.value}/{change.name}: hook 执行失败")
+                change_info["message"] = "hook 执行失败"
+                results["failed"] += 1
+
+        results["details"].append(change_info)
 
     return results
