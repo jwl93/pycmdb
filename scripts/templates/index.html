@@ -471,8 +471,7 @@
                 <textarea class="editor-textarea" id="editor-content" placeholder="加载中..."></textarea>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-warning" onclick="validateFile()">🔍 校验</button>
-                <button class="btn btn-primary" onclick="saveFile()">💾 保存</button>
+                <button class="btn btn-primary" onclick="saveFile()">💾 保存（保存前会校验）</button>
                 <button class="btn" onclick="closeEditor()">取消</button>
             </div>
         </div>
@@ -674,30 +673,6 @@
             currentFilePath = null;
         }
 
-        async function validateFile() {
-            if (!currentFilePath) return;
-
-            const content = document.getElementById('editor-content').value;
-            const validateEl = document.getElementById('file-validate-result');
-
-            try {
-                const res = await fetch(`/api/files/${currentFilePath}/validate`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({content})
-                });
-                const data = await res.json();
-
-                if (data.valid) {
-                    validateEl.innerHTML = '<div class="validate-result valid">✅ 校验通过</div>';
-                } else {
-                    validateEl.innerHTML = `<div class="validate-result invalid">❌ 校验失败: ${data.errors.join(', ')}</div>`;
-                }
-            } catch (e) {
-                validateEl.innerHTML = `<div class="validate-result invalid">❌ 校验失败: ${e.message}</div>`;
-            }
-        }
-
         async function saveFile() {
             if (!currentFilePath) return;
 
@@ -705,19 +680,33 @@
             const validateEl = document.getElementById('file-validate-result');
 
             try {
-                const res = await fetch(`/api/files/${currentFilePath}`, {
+                // 先校验
+                const validateRes = await fetch(`/api/files/${currentFilePath}/validate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content})
+                });
+                const validateData = await validateRes.json();
+
+                if (!validateData.valid) {
+                    validateEl.innerHTML = `<div class="validate-result invalid">❌ 校验失败:\n${validateData.errors.map(e => '  - ' + e).join('\n')}</div>`;
+                    return;
+                }
+
+                // 校验通过，保存
+                const saveRes = await fetch(`/api/files/${currentFilePath}`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({content})
                 });
-                const data = await res.json();
+                const saveData = await saveRes.json();
 
-                if (data.success) {
+                if (saveData.success) {
                     addLog('INFO', `文件已保存: ${currentFilePath}`);
                     validateEl.innerHTML = '<div class="validate-result valid">✅ 保存成功</div>';
                     refreshChanges();
                 } else {
-                    validateEl.innerHTML = `<div class="validate-result invalid">❌ 保存失败: ${data.error}</div>`;
+                    validateEl.innerHTML = `<div class="validate-result invalid">❌ 保存失败: ${saveData.error}</div>`;
                 }
             } catch (e) {
                 validateEl.innerHTML = `<div class="validate-result invalid">❌ 保存失败: ${e.message}</div>`;

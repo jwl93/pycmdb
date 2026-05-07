@@ -365,10 +365,13 @@ def api_file_schema(file_path: str):
 def api_file_validate(file_path: str):
     """
     校验文件内容
+    如果请求体中有 content 字段，则校验传入内容（预校验）
+    否则读取文件的实际内容进行校验
     """
     from scripts import get_cmdb_root
     from scripts.validator import validate_config
     from scripts.detector import ConfigType, Change
+    import yaml
 
     root = get_cmdb_root()
     file_full_path = root / "publish" / file_path
@@ -391,14 +394,25 @@ def api_file_validate(file_path: str):
     except ValueError:
         return jsonify({"error": f"未知配置类型: {config_type_str}"}), 400
 
-    # 读取文件内容
+    # 获取请求数据
+    data = request.get_json() or {}
+    content = data.get("content")
+
+    # 如果没有传入 content，读取文件
+    if content is None:
+        if not file_full_path.exists():
+            return jsonify({"valid": False, "errors": ["文件不存在"]})
+        try:
+            with open(file_full_path) as f:
+                content = f.read()
+        except Exception as e:
+            return jsonify({"valid": False, "errors": [f"文件读取失败: {str(e)}"]})
+
+    # 解析 YAML
     try:
-        with open(file_full_path) as f:
-            content = f.read()
-        import yaml
-        data = yaml.safe_load(content)
+        parsed_data = yaml.safe_load(content)
     except Exception as e:
-        return jsonify({"valid": False, "errors": [f"文件读取失败: {str(e)}"]})
+        return jsonify({"valid": False, "errors": [f"YAML 解析失败: {str(e)}"]})
 
     # 创建假的 Change 对象用于校验
     change = Change(
@@ -409,10 +423,15 @@ def api_file_validate(file_path: str):
         new_path=file_full_path,
     )
 
-    valid, errors = validate_change(change)
+    # 直接校验传入的数据（使用临时 Change 对象）
+    from scripts.validator import validate_references, validate_business_rules
+
+    errors = []
+    errors.extend(validate_references(change, parsed_data))
+    errors.extend(validate_business_rules(config_type, name, parsed_data))
 
     return jsonify({
-        "valid": valid,
+        "valid": len(errors) == 0,
         "errors": errors,
     })
 
