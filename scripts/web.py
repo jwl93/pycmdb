@@ -423,10 +423,18 @@ def api_file_validate(file_path: str):
         new_path=file_full_path,
     )
 
-    # 直接校验传入的数据（使用临时 Change 对象）
-    from scripts.validator import validate_references, validate_business_rules
+    # 直接校验传入的数据
+    from scripts.validator import validate_config, validate_references, validate_business_rules
 
     errors = []
+
+    # JSON Schema 校验（会检测 name 缺失等）
+    try:
+        validate_config(config_type, name, parsed_data)
+    except Exception as e:
+        errors.append(f"Schema 校验失败: {str(e)}")
+
+    # 业务规则校验
     errors.extend(validate_references(change, parsed_data))
     errors.extend(validate_business_rules(config_type, name, parsed_data))
 
