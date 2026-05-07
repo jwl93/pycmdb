@@ -1204,6 +1204,11 @@
         }
 
         function startLogStream() {
+            // 防止重复连接
+            if (logSource) {
+                logSource.close();
+            }
+
             fetch('/api/logs/latest')
                 .then(r => r.json())
                 .then(data => {
@@ -1214,9 +1219,17 @@
             logSource = new EventSource('/api/logs');
             logSource.onmessage = (e) => {
                 const log = JSON.parse(e.data);
-                logs.push(log);
-                if (logs.length > 100) logs.shift();
-                renderLogs();
+                // 防止重复添加（基于时间和消息去重）
+                const isDuplicate = logs.some(l => l.time === log.time && l.message === log.message);
+                if (!isDuplicate) {
+                    logs.push(log);
+                    if (logs.length > 100) logs.shift();
+                    renderLogs();
+                }
+            };
+            logSource.onerror = () => {
+                logSource.close();
+                logSource = null;
             };
         }
 
