@@ -33,11 +33,15 @@ def get_defaults(config_type: ConfigType) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def validate_config(config_type: ConfigType, name: str, data: dict) -> dict:
+def validate_config(config_type: ConfigType, name: str, data: Optional[dict]) -> dict:
     """
     校验配置并应用默认值
     返回合并默认值后的完整配置
     """
+    # 处理空数据
+    if data is None:
+        data = {}
+
     schema = get_schema(config_type)
     if not schema:
         return data
@@ -52,8 +56,10 @@ def validate_config(config_type: ConfigType, name: str, data: dict) -> dict:
     return data
 
 
-def _merge_defaults(data: dict, defaults: dict) -> dict:
+def _merge_defaults(data: Optional[dict], defaults: dict) -> dict:
     """递归合并默认值"""
+    if data is None:
+        data = {}
     result = defaults.copy()
     for key, value in data.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
