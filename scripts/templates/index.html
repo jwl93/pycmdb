@@ -808,7 +808,7 @@
                 return;
             }
 
-            container.innerHTML = logs.map(l => `
+            container.innerHTML = logs.slice().reverse().map(l => `
                 <div class="log-entry">
                     <span class="log-time">${l.time}</span>
                     <span class="log-level ${l.level}">[${l.level}]</span>
@@ -816,7 +816,7 @@
                 </div>
             `).join('');
 
-            container.scrollTop = container.scrollHeight;
+            container.scrollTop = 0;
         }
 
         function clearLogs() {
