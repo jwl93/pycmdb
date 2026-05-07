@@ -484,6 +484,76 @@ def api_file_create():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/files/<path:file_path>/can_delete", methods=["GET"])
+def api_file_can_delete(file_path: str):
+    """
+    检查文件是否可以删除（是否有依赖）
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    file_full_path = root / "publish" / file_path
+
+    # 安全检查
+    try:
+        file_full_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    parts = file_path.split("/")
+    if len(parts) < 3 or parts[1] != "config":
+        return jsonify({"error": "无效路径"}), 400
+
+    config_type = parts[0]
+    name = parts[2]
+
+    dependencies = []
+
+    if config_type == "host_groups":
+        # 检查是否有 host 引用此 group
+        hosts_dir = root / "publish" / "hosts" / "config"
+        if hosts_dir.exists():
+            for host_file in hosts_dir.iterdir():
+                if host_file.is_file() and not host_file.name.startswith("_"):
+                    try:
+                        with open(host_file) as f:
+                            import yaml
+                            data = yaml.safe_load(f)
+                            host_groups = data.get("host_group", [])
+                            if isinstance(host_groups, list) and name in host_groups:
+                                dependencies.append(f"hosts/{host_file.name}")
+                            elif host_groups == name:
+                                dependencies.append(f"hosts/{host_file.name}")
+                    except Exception:
+                        pass
+
+    elif config_type == "hosts":
+        # 检查是否有 services 引用此 host
+        services_dir = root / "publish" / "services" / "config"
+        if services_dir.exists():
+            for svc_file in services_dir.iterdir():
+                if svc_file.is_file() and not svc_file.name.startswith("_"):
+                    try:
+                        with open(svc_file) as f:
+                            import yaml
+                            data = yaml.safe_load(f)
+                            hosts_refs = data.get("hosts", [])
+                            for ref in hosts_refs:
+                                # 裸名称或 host: 前缀
+                                ref_name = ref.replace("host:", "") if ref.startswith("host:") else ref
+                                if ref_name == name:
+                                    dependencies.append(f"services/{svc_file.name}")
+                    except Exception:
+                        pass
+
+    can_delete = len(dependencies) == 0
+
+    return jsonify({
+        "can_delete": can_delete,
+        "dependencies": dependencies,
+    })
+
+
 @app.route("/api/files/<path:file_path>", methods=["DELETE"])
 def api_file_delete(file_path: str):
     """
@@ -505,6 +575,53 @@ def api_file_delete(file_path: str):
 
     if not file_full_path.is_file():
         return jsonify({"error": "不是文件"}), 400
+
+    # 检查依赖
+    parts = file_path.split("/")
+    if len(parts) >= 3 and parts[1] == "config":
+        config_type = parts[0]
+        name = parts[2]
+
+        dependencies = []
+        if config_type == "host_groups":
+            hosts_dir = root / "publish" / "hosts" / "config"
+            if hosts_dir.exists():
+                for host_file in hosts_dir.iterdir():
+                    if host_file.is_file():
+                        try:
+                            with open(host_file) as f:
+                                import yaml
+                                data = yaml.safe_load(f)
+                                host_groups = data.get("host_group", [])
+                                if isinstance(host_groups, list) and name in host_groups:
+                                    dependencies.append(f"hosts/{host_file.name}")
+                                elif host_groups == name:
+                                    dependencies.append(f"hosts/{host_file.name}")
+                        except Exception:
+                            pass
+        elif config_type == "hosts":
+            services_dir = root / "publish" / "services" / "config"
+            if services_dir.exists():
+                for svc_file in services_dir.iterdir():
+                    if svc_file.is_file():
+                        try:
+                            with open(svc_file) as f:
+                                import yaml
+                                data = yaml.safe_load(f)
+                                hosts_refs = data.get("hosts", [])
+                                for ref in hosts_refs:
+                                    ref_name = ref.replace("host:", "") if ref.startswith("host:") else ref
+                                    if ref_name == name:
+                                        dependencies.append(f"services/{svc_file.name}")
+                        except Exception:
+                            pass
+
+        if dependencies:
+            return jsonify({
+                "success": False,
+                "error": f"被其他配置引用",
+                "dependencies": dependencies,
+            }), 409
 
     try:
         file_full_path.unlink()
