@@ -13,11 +13,14 @@ jsonschema = "*"
 jinja2 = "*"
 gitpython = "*"
 click = "*"
+flask = "*"
+flask-cors = ">=6.0.2,<7"
 
 [tasks]
 detect = "python -m scripts.cli detect"
 validate = "python -m scripts.cli validate"
 deploy = "python -m scripts.cli deploy"
+web = "python -m scripts.web"
 
 [activation]
 scripts = ["scripts/setup_hooks.sh"]

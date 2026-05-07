@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMDB - 配置管理</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        header h1 {
+            text-align: center;
+            font-size: 24px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: #ecf0f1;
+            padding: 15px 20px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .changes-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .change-item {
+            display: flex;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+        }
+        .change-item:last-child {
+            border-bottom: none;
+        }
+        .change-type {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 12px;
+            min-width: 60px;
+            text-align: center;
+        }
+        .change-type.new { background: #27ae60; color: white; }
+        .change-type.update { background: #f39c12; color: white; }
+        .change-type.delete { background: #e74c3c; color: white; }
+        .config-type {
+            color: #7f8c8d;
+            font-size: 14px;
+            min-width: 100px;
+        }
+        .change-name {
+            font-weight: 500;
+            flex: 1;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #229954;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 13px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            display: flex;
+            gap: 10px;
+        }
+        .log-time {
+            color: #6a9955;
+        }
+        .log-level {
+            font-weight: bold;
+        }
+        .log-level.INFO { color: #4fc3f7; }
+        .log-level.WARN { color: #ffb74d; }
+        .log-level.ERROR { color: #ef5350; }
+        .log-message { flex: 1; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-dot.green { background: #27ae60; }
+        .status-dot.yellow { background: #f39c12; }
+        .status-dot.red { background: #e74c3c; }
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        .filter-group select, .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .filter-group input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🗄️ CMDB 配置管理中心</h1>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <span><span class="status-dot green"></span>检测到的变更</span>
+                <button class="btn btn-primary" onclick="refreshChanges()">🔄 刷新</button>
+            </div>
+            <div class="card-body">
+                <div id="changes-container">
+                    <div class="empty-state">加载中...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>操作</span>
+            </div>
+            <div class="card-body">
+                <div class="filter-group">
+                    <select id="filter-type">
+                        <option value="">全部类型</option>
+                        <option value="hosts">主机</option>
+                        <option value="host_groups">主机组</option>
+                        <option value="services">服务</option>
+                    </select>
+                    <input type="text" id="filter-targets" placeholder="目标（逗号分隔，如 web-01,web-02）">
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="validateChanges()">✅ 校验变更</button>
+                    <button class="btn btn-primary" onclick="validateAll()">✅ 校验全部</button>
+                    <button class="btn btn-success" onclick="deployChanges()">🚀 部署变更</button>
+                    <button class="btn btn-success" onclick="deployAll()">🚀 部署全部</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>操作日志</span>
+                <button class="btn btn-primary" onclick="clearLogs()" style="padding: 5px 10px; font-size: 12px;">清空</button>
+            </div>
+            <div class="card-body">
+                <div class="log-container" id="log-container">
+                    <div class="empty-state">暂无日志</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logs = [];
+        let logSource = null;
+
+        // 页面加载时获取变更
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshChanges();
+            startLogStream();
+        });
+
+        // 刷新变更列表
+        async function refreshChanges() {
+            try {
+                const res = await fetch('/api/changes');
+                const data = await res.json();
+                renderChanges(data);
+            } catch (e) {
+                addLog('ERROR', '获取变更失败: ' + e.message);
+            }
+        }
+
+        // 渲染变更列表
+        function renderChanges(data) {
+            const container = document.getElementById('changes-container');
+
+            if (data.count === 0) {
+                container.innerHTML = '<div class="empty-state">✅ 暂无变更</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="changes-list">
+                    ${data.changes.map(c => `
+                        <div class="change-item">
+                            <span class="change-type ${c.change_type}">${c.change_type}</span>
+                            <span class="config-type">${c.config_type}</span>
+                            <span class="change-name">${c.name}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // 校验变更
+        async function validateChanges() {
+            await validate(false);
+        }
+
+        // 校验全部
+        async function validateAll() {
+            await validate(true);
+        }
+
+        async function validate(all) {
+            addLog('INFO', `开始校验 (all=${all})...`);
+            try {
+                const res = await fetch('/api/validate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({all})
+                });
+                const data = await res.json();
+
+                if (data.valid) {
+                    addLog('INFO', `校验通过 (${data.total} 项)`);
+                } else {
+                    const failed = data.results.filter(r => !r.valid);
+                    addLog('ERROR', `校验失败 (${failed.length} 项)`);
+                    failed.forEach(f => {
+                        addLog('ERROR', `  - ${f.config_type}/${f.name}: ${f.errors.join(', ')}`);
+                    });
+                }
+            } catch (e) {
+                addLog('ERROR', '校验失败: ' + e.message);
+            }
+        }
+
+        // 部署变更
+        async function deployChanges() {
+            const type = document.getElementById('filter-type').value;
+            const targets = document.getElementById('filter-targets').value;
+
+            if (!confirm('确认部署选定的变更?')) return;
+
+            addLog('INFO', `开始部署 (type=${type || '全部'}, targets=${targets || '全部'})...`);
+            try {
+                const res = await fetch('/api/deploy', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({type, targets})
+                });
+
+                const data = await res.json();
+
+                if (res.status === 409) {
+                    addLog('ERROR', '部署被锁定: ' + data.error);
+                    return;
+                }
+
+                if (data.success) {
+                    addLog('INFO', `部署完成: ${data.results.success} 成功`);
+                    refreshChanges();
+                } else {
+                    addLog('ERROR', '部署失败: ' + data.error);
+                }
+            } catch (e) {
+                addLog('ERROR', '部署失败: ' + e.message);
+            }
+        }
+
+        // 部署全部（只是用所有变更部署）
+        async function deployAll() {
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-targets').value = '';
+            await deployChanges();
+        }
+
+        // 添加日志
+        function addLog(level, message) {
+            const time = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+            logs.push({time, level, message});
+
+            // 只保留最近 100 条
+            if (logs.length > 100) logs.shift();
+
+            renderLogs();
+        }
+
+        // 渲染日志
+        function renderLogs() {
+            const container = document.getElementById('log-container');
+
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无日志</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(l => `
+                <div class="log-entry">
+                    <span class="log-time">${l.time}</span>
+                    <span class="log-level ${l.level}">[${l.level}]</span>
+                    <span class="log-message">${escapeHtml(l.message)}</span>
+                </div>
+            `).join('');
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 清空日志
+        function clearLogs() {
+            logs = [];
+            renderLogs();
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 启动日志流
+        function startLogStream() {
+            // 先获取最新日志
+            fetch('/api/logs/latest')
+                .then(r => r.json())
+                .then(data => {
+                    logs = data;
+                    renderLogs();
+                });
+
+            // 然后建立 SSE 连接
+            logSource = new EventSource('/api/logs');
+            logSource.onmessage = (e) => {
+                const log = JSON.parse(e.data);
+                logs.push(log);
+                if (logs.length > 100) logs.shift();
+                renderLogs();
+            };
+        }
+    </script>
+</body>
+</html>
