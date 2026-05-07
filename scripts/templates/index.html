@@ -26,7 +26,7 @@
             height: calc(100vh - 180px);
         }
         .main-panel {
-            flex: 2;
+            flex: 1;
             display: flex;
             flex-direction: column;
             gap: 15px;
@@ -34,8 +34,8 @@
         }
         .logs-panel {
             flex: 1;
-            min-width: 320px;
-            max-width: 450px;
+            min-width: 480px;
+            max-width: 600px;
         }
         .logs-panel .card {
             height: 100%;
@@ -421,7 +421,7 @@
                                 <button class="btn btn-primary" onclick="validateChanges()">✅ 校验变更</button>
                                 <button class="btn btn-primary" onclick="validateAll()">✅ 校验全部</button>
                                 <button class="btn btn-success" onclick="deployChanges()">🚀 部署变更</button>
-                                <button class="btn btn-success" onclick="deployAll()">🚀 部署全部</button>
+                                <button class="btn btn-warning" onclick="showRedeployModal()">🔄 重新部署</button>
                             </div>
                         </div>
                     </div>
@@ -492,6 +492,37 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" onclick="createFile()">创建</button>
                 <button class="btn" onclick="closeNewFileModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重新部署 Modal -->
+    <div class="modal" id="redeploy-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔄 重新部署</h3>
+                <button class="modal-close" onclick="closeRedeployModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: #7f8c8d;">选择要重新部署的配置（可多选）：</p>
+                <div class="filter-group" style="margin-bottom: 15px;">
+                    <select id="redeploy-filter-type" onchange="filterRedeployConfigs()">
+                        <option value="">全部类型</option>
+                        <option value="hosts">主机</option>
+                        <option value="host_groups">主机组</option>
+                        <option value="services">服务</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="selectAllRedeploy()" style="padding: 8px 12px;">全选</button>
+                    <button class="btn" onclick="deselectAllRedeploy()" style="padding: 8px 12px;">取消全选</button>
+                </div>
+                <div id="redeploy-configs-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
+                    <div class="empty-state">加载中...</div>
+                </div>
+                <p style="margin-top: 15px; font-size: 13px; color: #7f8c8d;">已选择: <span id="redeploy-selected-count">0</span> 个配置</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-warning" onclick="redepolySelected()">🔄 重新部署</button>
+                <button class="btn" onclick="closeRedeployModal()">取消</button>
             </div>
         </div>
     </div>
@@ -635,6 +666,120 @@
             document.getElementById('filter-type').value = '';
             document.getElementById('filter-targets').value = '';
             await deployChanges();
+        }
+
+        // ========== 重新部署 ==========
+
+        let allConfigs = [];
+        let selectedRedeployConfigs = new Set();
+
+        async function showRedeployModal() {
+            const modal = document.getElementById('redeploy-modal');
+            modal.classList.add('active');
+
+            // 加载所有配置
+            try {
+                const res = await fetch('/api/all_configs');
+                const data = await res.json();
+                allConfigs = data.configs || [];
+                selectedRedeployConfigs.clear();
+                filterRedeployConfigs();
+            } catch (e) {
+                addLog('ERROR', '加载配置列表失败: ' + e.message);
+            }
+        }
+
+        function closeRedeployModal() {
+            document.getElementById('redeploy-modal').classList.remove('active');
+        }
+
+        function filterRedeployConfigs() {
+            const typeFilter = document.getElementById('redeploy-filter-type').value;
+            const filtered = typeFilter ? allConfigs.filter(c => c.type === typeFilter) : allConfigs;
+
+            const container = document.getElementById('redeploy-configs-list');
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无配置</div>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => {
+                const isSelected = selectedRedeployConfigs.has(`${c.type}:${c.name}`);
+                const checkedAttr = isSelected ? 'checked' : '';
+                return `
+                    <div class="tree-item" onclick="toggleRedeployConfig('${c.type}', '${c.name}')">
+                        <input type="checkbox" ${checkedAttr} onclick="event.stopPropagation(); toggleRedeployConfig('${c.type}', '${c.name}')" style="margin-right: 8px;">
+                        <span class="config-type">${c.type}</span>
+                        <span class="file-name">${c.name}</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('redeploy-selected-count').textContent = selectedRedeployConfigs.size;
+        }
+
+        function toggleRedeployConfig(type, name) {
+            const key = `${type}:${name}`;
+            if (selectedRedeployConfigs.has(key)) {
+                selectedRedeployConfigs.delete(key);
+            } else {
+                selectedRedeployConfigs.add(key);
+            }
+            filterRedeployConfigs();
+        }
+
+        function selectAllRedeploy() {
+            const typeFilter = document.getElementById('redeploy-filter-type').value;
+            const filtered = typeFilter ? allConfigs.filter(c => c.type === typeFilter) : allConfigs;
+            filtered.forEach(c => selectedRedeployConfigs.add(`${c.type}:${c.name}`));
+            filterRedeployConfigs();
+        }
+
+        function deselectAllRedeploy() {
+            selectedRedeployConfigs.clear();
+            filterRedeployConfigs();
+        }
+
+        async function redepolySelected() {
+            if (selectedRedeployConfigs.size === 0) {
+                alert('请选择要部署的配置');
+                return;
+            }
+
+            if (!confirm(`确认重新部署 ${selectedRedeployConfigs.size} 个配置?`)) return;
+
+            const configs = Array.from(selectedRedeployConfigs).map(key => {
+                const [type, name] = key.split(':');
+                return {type, name};
+            });
+
+            closeRedeployModal();
+            addLog('INFO', `开始重新部署 (${configs.length} 个配置)...`);
+
+            try {
+                const res = await fetch('/api/redeploy', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({configs})
+                });
+
+                const data = await res.json();
+
+                if (res.status === 409) {
+                    addLog('ERROR', '部署被锁定: ' + data.error);
+                    return;
+                }
+
+                if (data.success) {
+                    addLog('INFO', `重新部署完成: ${data.results.success} 成功`);
+                    refreshChanges();
+                } else {
+                    addLog('ERROR', '重新部署失败: ' + data.error);
+                }
+            } catch (e) {
+                addLog('ERROR', '重新部署失败: ' + e.message);
+            }
         }
 
         // ========== 文件编辑 ==========
@@ -943,7 +1088,10 @@
 
         // ESC 关闭 Modal
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeEditor();
+            if (e.key === 'Escape') {
+                closeEditor();
+                closeRedeployModal();
+            }
         });
     </script>
 </body>

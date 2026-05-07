@@ -9,9 +9,10 @@ from pathlib import Path
 from flask import Flask, render_template, request, jsonify, Response
 from flask_cors import CORS
 
-from scripts.detector import detect_changes, scan_all_configs, ChangeType
+from scripts.detector import detect_changes, scan_all_configs, ChangeType, ConfigType, Change
 from scripts.validator import validate_change
 from scripts.lock import DeployLock
+from scripts import get_cmdb_root
 
 app = Flask(__name__, template_folder="templates")
 CORS(app)
@@ -111,7 +112,7 @@ def api_validate():
 
 @app.route("/api/deploy", methods=["POST"])
 def api_deploy():
-    """执行部署"""
+    """执行部署（基于当前 git 变更）"""
     from scripts.executor import execute_changes
 
     data = request.get_json() or {}
@@ -182,6 +183,135 @@ def api_deploy():
 
     finally:
         lock.release()
+
+
+@app.route("/api/redeploy", methods=["POST"])
+def api_redeploy():
+    """
+    重新部署指定的配置（不依赖 git diff）
+    请求体: {"configs": [{"type": "hosts", "name": "web-01"}, ...]}
+    """
+    from scripts.executor import execute_changes
+
+    data = request.get_json() or {}
+    configs = data.get("configs", [])
+
+    add_log("INFO", f"开始重新部署 ({len(configs)} 个配置)...")
+
+    if not configs:
+        add_log("WARN", "没有指定要部署的配置")
+        return jsonify({"success": False, "error": "没有指定要部署的配置"})
+
+    # 检查锁
+    lock = DeployLock()
+    acquired, msg = lock.acquire()
+    if not acquired:
+        add_log("ERROR", f"部署被锁定: {msg}")
+        return jsonify({"success": False, "error": msg}), 409
+
+    try:
+        # 构建 Change 对象列表
+        changes = []
+        for cfg in configs:
+            config_type_str = cfg.get("type")
+            name = cfg.get("name")
+
+            if not config_type_str or not name:
+                continue
+
+            try:
+                config_type = ConfigType(config_type_str)
+            except ValueError:
+                add_log("ERROR", f"未知配置类型: {config_type_str}")
+                continue
+
+            # 获取配置文件路径
+            root = get_cmdb_root()
+            config_dir = root / "publish" / config_type_str / "config"
+            file_path = config_dir / name
+
+            if not file_path.exists():
+                add_log("WARN", f"配置文件不存在: {config_type_str}/{name}")
+                continue
+
+            change = Change(
+                config_type=config_type,
+                change_type=ChangeType.UPDATE,
+                name=name,
+                old_path=file_path,
+                new_path=file_path,
+            )
+            changes.append(change)
+
+        if not changes:
+            add_log("WARN", "没有找到有效的配置")
+            return jsonify({"success": False, "error": "没有找到有效的配置"})
+
+        # 校验
+        for c in changes:
+            valid, errors = validate_change(c)
+            if not valid:
+                add_log("ERROR", f"校验失败: {c.config_type.value}/{c.name}")
+                return jsonify({
+                    "success": False,
+                    "error": f"校验失败: {c.config_type.value}/{c.name}",
+                    "details": errors,
+                })
+
+        # 执行 hooks 并自动 git commit/push
+        results = execute_changes(changes, dry_run=False)
+
+        # 记录详细日志
+        for log in results.get("logs", []):
+            if log.startswith("[OK]"):
+                add_log("INFO", log)
+            elif log.startswith("[FAIL]"):
+                add_log("ERROR", log)
+            elif log.startswith("[ERROR]"):
+                add_log("ERROR", log)
+            elif log.startswith("[COMMIT]"):
+                add_log("INFO", log)
+            elif log.startswith("[SKIP]"):
+                add_log("WARN", log)
+            else:
+                add_log("INFO", log)
+
+        if results["failed"] > 0:
+            add_log("ERROR", f"重新部署完成: {results['success']} 成功, {results['failed']} 失败")
+        else:
+            add_log("INFO", f"重新部署完成: {results['success']} 成功, {results['failed']} 失败")
+
+        return jsonify({
+            "success": results["failed"] == 0,
+            "results": results,
+        })
+
+    finally:
+        lock.release()
+
+
+@app.route("/api/all_configs", methods=["GET"])
+def api_all_configs():
+    """
+    获取所有配置（用于重新部署选择）
+    """
+    configs = []
+
+    for config_type in ConfigType:
+        root = get_cmdb_root()
+        config_dir = root / "publish" / config_type.value / "config"
+
+        if not config_dir.exists():
+            continue
+
+        for config_file in config_dir.iterdir():
+            if config_file.is_file() and not config_file.name.startswith("_"):
+                configs.append({
+                    "type": config_type.value,
+                    "name": config_file.name,
+                })
+
+    return jsonify({"configs": configs})
 
 
 @app.route("/api/logs")

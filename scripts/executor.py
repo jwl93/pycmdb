@@ -23,10 +23,10 @@ def get_hook_path(change: Change) -> Path:
     return get_cmdb_root() / "hooks" / get_hook_name(change)
 
 
-def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
+def git_add_and_commit(change: Change, message: Optional[str] = None) -> tuple[bool, str]:
     """
     将变更文件 git add, commit 并 push
-    返回是否成功
+    返回 (是否成功, 状态信息)
     """
     from scripts.detector import get_config_content
 
@@ -40,7 +40,7 @@ def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
         file_list = [str(path)] if path else []
 
     if not file_list:
-        return True
+        return True, "跳过: 无文件"
 
     if message is None:
         action = {
@@ -51,6 +51,16 @@ def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
         message = f"{action} {change.config_type.value}: {change.name}"
 
     try:
+        # 检查是否有实际变更
+        diff_result = subprocess.run(
+            ["git", "diff", "--stat"] + file_list,
+            capture_output=True,
+            text=True
+        )
+        if not diff_result.stdout.strip():
+            # 文件没有实际变更，跳过 commit
+            return True, "跳过: 文件无变更"
+
         # git add
         subprocess.run(["git", "add"] + file_list, check=True, capture_output=True)
         # git commit
@@ -62,10 +72,11 @@ def git_add_and_commit(change: Change, message: Optional[str] = None) -> bool:
         )
         # git push
         subprocess.run(["git", "push"], check=True, capture_output=True)
-        return True
+        return True, "已提交"
     except subprocess.CalledProcessError as e:
-        print(f"[ERROR] git push 失败: {e.stderr.decode() if e.stderr else e}")
-        return False
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        print(f"[ERROR] git push 失败: {error_msg}")
+        return False, f"提交失败: {error_msg}"
 
 
 def load_hook(change: Change):
@@ -250,11 +261,12 @@ def execute_changes(changes: list[Change], dry_run: bool = False, auto_commit: b
                 results["logs"].append(f"[OK] {change.config_type.value}/{change.name} ({change.change_type.value})")
                 # hook 执行成功后自动 commit (包括 DELETE)
                 if auto_commit:
-                    if git_add_and_commit(change):
-                        results["logs"].append(f"[COMMIT] {change.config_type.value}/{change.name}: 已提交")
+                    commit_ok, commit_msg = git_add_and_commit(change)
+                    if commit_ok:
+                        results["logs"].append(f"[COMMIT] {change.config_type.value}/{change.name}: {commit_msg}")
                         change_info["message"] = "执行成功，已提交"
                     else:
-                        results["logs"].append(f"[ERROR] {change.config_type.value}/{change.name}: git 提交失败")
+                        results["logs"].append(f"[ERROR] {change.config_type.value}/{change.name}: {commit_msg}")
                         change_info["message"] = "执行成功，但 git 提交失败"
                 else:
                     change_info["message"] = "执行成功"
