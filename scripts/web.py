@@ -195,6 +195,230 @@ def api_logs_latest():
         return jsonify(logs[-20:] if logs else [])
 
 
+# ========== 文件管理 API ==========
+
+@app.route("/api/files")
+def api_files_tree():
+    """
+    获取 publish 目录结构（树形）
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    publish_dir = root / "publish"
+
+    def walk_dir(path: Path, rel_path: str = ""):
+        items = []
+        for item in sorted(path.iterdir()):
+            if item.name.startswith("."):
+                continue
+            rel = f"{rel_path}/{item.name}" if rel_path else item.name
+            if item.is_dir():
+                children = walk_dir(item, rel)
+                items.append({
+                    "name": item.name,
+                    "path": rel,
+                    "type": "directory",
+                    "children": children,
+                })
+            else:
+                items.append({
+                    "name": item.name,
+                    "path": rel,
+                    "type": "file",
+                })
+        return items
+
+    if not publish_dir.exists():
+        return jsonify([])
+
+    tree = []
+    for config_type in ["hosts", "host_groups", "services"]:
+        config_dir = publish_dir / config_type / "config"
+        if config_dir.exists():
+            items = []
+            for item in sorted(config_dir.iterdir()):
+                if item.name.startswith("."):
+                    continue
+                items.append({
+                    "name": item.name,
+                    "path": f"{config_type}/config/{item.name}",
+                    "type": "file",
+                })
+            tree.append({
+                "name": config_type,
+                "path": config_type,
+                "type": "directory",
+                "children": items,
+            })
+
+    return jsonify(tree)
+
+
+@app.route("/api/files/<path:file_path>")
+def api_file_read(file_path: str):
+    """
+    读取文件内容
+    """
+    from scripts import get_cmdb_root
+    import yaml
+
+    root = get_cmdb_root()
+    file_full_path = root / "publish" / file_path
+
+    # 安全检查
+    try:
+        file_full_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    if not file_full_path.exists():
+        return jsonify({"error": "文件不存在"}), 404
+
+    if not file_full_path.is_file():
+        return jsonify({"error": "不是文件"}), 400
+
+    try:
+        with open(file_full_path) as f:
+            content = f.read()
+
+        # 尝试解析为 YAML
+        try:
+            data = yaml.safe_load(content)
+            is_yaml = True
+        except Exception:
+            data = None
+            is_yaml = False
+
+        return jsonify({
+            "path": file_path,
+            "content": content,
+            "is_yaml": is_yaml,
+            "data": data,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/files/<path:file_path>", methods=["PUT"])
+def api_file_write(file_path: str):
+    """
+    写入文件内容
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    file_full_path = root / "publish" / file_path
+
+    # 安全检查
+    try:
+        file_full_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    data = request.get_json()
+    if not data or "content" not in data:
+        return jsonify({"error": "缺少 content 字段"}), 400
+
+    content = data["content"]
+
+    try:
+        # 确保目录存在
+        file_full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_full_path, "w") as f:
+            f.write(content)
+
+        add_log("INFO", f"文件已保存: {file_path}")
+
+        return jsonify({"success": True, "path": file_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/files/<path:file_path>/schema", methods=["GET"])
+def api_file_schema(file_path: str):
+    """
+    获取文件的 JSON Schema
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    parts = file_path.split("/")
+
+    if len(parts) < 1:
+        return jsonify({"error": "非法路径"}), 400
+
+    config_type = parts[0]
+    schema_path = root / "publish" / config_type / "_schema.json"
+
+    if not schema_path.exists():
+        return jsonify({"error": "Schema 不存在"}), 404
+
+    try:
+        with open(schema_path) as f:
+            schema = json.load(f)
+        return jsonify(schema)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/files/<path:file_path>/validate", methods=["POST"])
+def api_file_validate(file_path: str):
+    """
+    校验文件内容
+    """
+    from scripts import get_cmdb_root
+    from scripts.validator import validate_config
+    from scripts.detector import ConfigType, Change
+
+    root = get_cmdb_root()
+    file_full_path = root / "publish" / file_path
+
+    # 安全检查
+    try:
+        file_full_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    parts = file_path.split("/")
+    if len(parts) < 2 or parts[1] != "config":
+        return jsonify({"error": "只能在 config 目录下校验"}), 400
+
+    config_type_str = parts[0]
+    name = parts[2] if len(parts) > 2 else ""
+
+    try:
+        config_type = ConfigType(config_type_str)
+    except ValueError:
+        return jsonify({"error": f"未知配置类型: {config_type_str}"}), 400
+
+    # 读取文件内容
+    try:
+        with open(file_full_path) as f:
+            content = f.read()
+        import yaml
+        data = yaml.safe_load(content)
+    except Exception as e:
+        return jsonify({"valid": False, "errors": [f"文件读取失败: {str(e)}"]})
+
+    # 创建假的 Change 对象用于校验
+    change = Change(
+        config_type=config_type,
+        change_type=ChangeType.UPDATE,
+        name=name,
+        old_path=file_full_path,
+        new_path=file_full_path,
+    )
+
+    valid, errors = validate_change(change)
+
+    return jsonify({
+        "valid": valid,
+        "errors": errors,
+    })
+
+
 def main():
     port = int(os.environ.get("PORT", 5000))
     add_log("INFO", f"CMDB Web 服务启动在 http://localhost:{port}")
