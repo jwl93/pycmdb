@@ -112,6 +112,8 @@ def api_validate():
 @app.route("/api/deploy", methods=["POST"])
 def api_deploy():
     """执行部署"""
+    from scripts.executor import execute_changes
+
     data = request.get_json() or {}
     config_type = data.get("type")
     targets = data.get("targets")
@@ -150,21 +152,16 @@ def api_deploy():
                     "details": errors,
                 })
 
-        # 执行
-        results = {"success": 0, "failed": 0, "details": []}
-        for c in changes:
-            add_log("INFO", f"执行: {c.config_type.value}/{c.name} ({c.change_type.value})")
-            results["details"].append({
-                "name": c.name,
-                "type": c.config_type.value,
-                "event": c.change_type.value,
-            })
-            results["success"] += 1
+        # 执行 hooks 并自动 git commit/push
+        results = execute_changes(changes, dry_run=False)
 
-        add_log("INFO", f"部署完成: {results['success']} 成功, {results['failed']} 失败")
+        if results["failed"] > 0:
+            add_log("ERROR", f"部署完成: {results['success']} 成功, {results['failed']} 失败")
+        else:
+            add_log("INFO", f"部署完成: {results['success']} 成功, {results['failed']} 失败")
 
         return jsonify({
-            "success": True,
+            "success": results["failed"] == 0,
             "results": results,
         })
 
