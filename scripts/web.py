@@ -17,7 +17,11 @@ from scripts import get_cmdb_root
 app = Flask(__name__, template_folder="templates")
 CORS(app)
 
-# 全局日志存储
+# 日志存储目录
+LOG_DIR = Path(__file__).parent.parent / ".logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+# 全局日志存储（今日日志）
 logs = []
 log_lock = threading.Lock()
 
@@ -25,15 +29,65 @@ log_lock = threading.Lock()
 def add_log(level: str, message: str):
     """添加日志"""
     import datetime
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%H:%M:%S")
+
+    log_entry = {
+        "date": date_str,
+        "time": time_str,
+        "level": level,
+        "message": message
+    }
+
     with log_lock:
-        logs.append({
-            "time": datetime.datetime.now().strftime("%H:%M:%S"),
-            "level": level,
-            "message": message
-        })
+        logs.append(log_entry)
         # 只保留最近 100 条
         if len(logs) > 100:
             logs.pop(0)
+
+    # 同时写入文件
+    _write_log_to_file(date_str, log_entry)
+
+
+def _get_log_file(date_str: str) -> Path:
+    """获取指定日期的日志文件路径"""
+    return LOG_DIR / f"{date_str}.json"
+
+
+def _write_log_to_file(date_str: str, log_entry: dict):
+    """写入日志到文件"""
+    log_file = _get_log_file(date_str)
+    try:
+        if log_file.exists():
+            with open(log_file) as f:
+                file_logs = json.load(f)
+        else:
+            file_logs = []
+
+        file_logs.append(log_entry)
+
+        # 只保留最近 1000 条
+        if len(file_logs) > 1000:
+            file_logs = file_logs[-1000:]
+
+        with open(log_file, "w") as f:
+            json.dump(file_logs, f)
+    except Exception:
+        pass
+
+
+def _read_logs_from_file(date_str: str) -> list:
+    """从文件读取指定日期的日志"""
+    log_file = _get_log_file(date_str)
+    if not log_file.exists():
+        return []
+
+    try:
+        with open(log_file) as f:
+            return json.load(f)
+    except Exception:
+        return []
 
 
 def run_command(cmd: list[str]) -> tuple[int, str]:
@@ -457,12 +511,32 @@ def api_logs():
 
 @app.route("/api/logs/latest")
 def api_logs_latest():
-    """获取最新日志"""
-    with log_lock:
-        return jsonify(logs[-20:] if logs else [])
+    """获取今日最新日志"""
+    import datetime
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    file_logs = _read_logs_from_file(today)
+    return jsonify(file_logs[-20:] if file_logs else [])
 
 
-# ========== 文件管理 API ==========
+@app.route("/api/logs/dates")
+def api_logs_dates():
+    """获取有日志的日期列表"""
+    try:
+        dates = []
+        for f in LOG_DIR.iterdir():
+            if f.suffix == ".json" and f.stem:
+                dates.append(f.stem)
+        dates.sort(reverse=True)
+        return jsonify({"dates": dates})
+    except Exception:
+        return jsonify({"dates": []})
+
+
+@app.route("/api/logs/<date_str>")
+def api_logs_by_date(date_str: str):
+    """获取指定日期的日志"""
+    file_logs = _read_logs_from_file(date_str)
+    return jsonify(file_logs)
 
 @app.route("/api/files")
 def api_files_tree():

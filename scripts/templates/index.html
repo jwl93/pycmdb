@@ -439,7 +439,12 @@
                     <div class="card">
                         <div class="card-header">
                             <span>操作日志</span>
-                            <button class="btn btn-primary" onclick="clearLogs()" style="padding: 5px 10px; font-size: 12px;">清空</button>
+                            <div style="display: flex; gap: 5px; align-items: center;">
+                                <select id="log-date-select" onchange="changeLogDate()" style="padding: 5px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <option value="">加载中...</option>
+                                </select>
+                                <button class="btn btn-primary" onclick="clearLogs()" style="padding: 5px 10px; font-size: 12px;">清空</button>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="log-container" id="log-container">
@@ -590,12 +595,14 @@
         let logs = [];
         let logSource = null;
         let currentFilePath = null;
+        let currentLogDate = '';  // 当前选择的日志日期
 
         // 页面加载时获取数据
         document.addEventListener('DOMContentLoaded', () => {
             refreshChanges();
             refreshFiles();
             refreshHistory();
+            loadLogDates();
             startLogStream();
         });
 
@@ -1183,7 +1190,7 @@
 
             container.innerHTML = logs.slice().reverse().map(l => `
                 <div class="log-entry">
-                    <span class="log-time">${l.time}</span>
+                    <span class="log-time">${l.date || ''} ${l.time || ''}</span>
                     <span class="log-level ${l.level}">[${l.level}]</span>
                     <span class="log-message">${escapeHtml(l.message)}</span>
                 </div>
@@ -1193,8 +1200,16 @@
         }
 
         function clearLogs() {
-            logs = [];
-            renderLogs();
+            if (!currentLogDate) {
+                logs = [];
+                renderLogs();
+            } else {
+                // 清空指定日期的日志（通过 API 实现）
+                fetch(`/api/logs/${currentLogDate}`, {method: 'DELETE'}).then(() => {
+                    logs = [];
+                    renderLogs();
+                });
+            }
         }
 
         function escapeHtml(text) {
@@ -1203,11 +1218,57 @@
             return div.innerHTML;
         }
 
+        async function loadLogDates() {
+            try {
+                const res = await fetch('/api/logs/dates');
+                const data = await res.json();
+                const select = document.getElementById('log-date-select');
+                const today = new Date().toISOString().split('T')[0];
+
+                select.innerHTML = '';
+
+                if (data.dates && data.dates.length > 0) {
+                    data.dates.forEach(date => {
+                        const option = document.createElement('option');
+                        option.value = date;
+                        option.textContent = date === today ? `${date} (今日)` : date;
+                        if (date === today) option.selected = true;
+                        select.appendChild(option);
+                    });
+                    currentLogDate = today;
+                } else {
+                    const option = document.createElement('option');
+                    option.value = today;
+                    option.textContent = `${today} (今日)`;
+                    select.appendChild(option);
+                    currentLogDate = today;
+                }
+            } catch (e) {
+                console.error('Failed to load log dates:', e);
+            }
+        }
+
+        async function changeLogDate() {
+            const select = document.getElementById('log-date-select');
+            currentLogDate = select.value;
+
+            try {
+                const res = await fetch(`/api/logs/${currentLogDate}`);
+                const data = await res.json();
+                logs = data;
+                renderLogs();
+            } catch (e) {
+                console.error('Failed to load logs:', e);
+            }
+        }
+
         function startLogStream() {
             // 防止重复连接
             if (logSource) {
                 logSource.close();
             }
+
+            const today = new Date().toISOString().split('T')[0];
 
             fetch('/api/logs/latest')
                 .then(r => r.json())
