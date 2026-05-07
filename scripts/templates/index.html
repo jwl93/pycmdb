@@ -375,6 +375,12 @@
             color: #7f8c8d;
             margin-bottom: 10px;
         }
+        #tab-history .split-layout {
+            height: calc(100vh - 180px);
+        }
+        #tab-history .main-panel {
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
@@ -386,6 +392,7 @@
         <div class="tabs">
             <button class="tab active" onclick="switchTab('changes')">📋 变更管理</button>
             <button class="tab" onclick="switchTab('files')">📁 文件编辑</button>
+            <button class="tab" onclick="switchTab('history')">📜 变更历史</button>
         </div>
 
         <!-- 变更管理 Tab -->
@@ -457,6 +464,38 @@
                 <div class="card-body">
                     <div class="file-tree" id="file-tree">
                         <div class="empty-state">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 变更历史 Tab -->
+        <div id="tab-history" class="tab-content">
+            <div class="split-layout">
+                <div class="main-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <span>📜 提交历史</span>
+                            <button class="btn btn-primary" onclick="refreshHistory()">🔄 刷新</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="history-container">
+                                <div class="empty-state">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="logs-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <span>变更详情</span>
+                        </div>
+                        <div class="card-body">
+                            <div id="history-detail" class="log-container" style="background: #fff; color: #333;">
+                                <div class="empty-state">选择一个提交查看详情</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -556,6 +595,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             refreshChanges();
             refreshFiles();
+            refreshHistory();
             startLogStream();
         });
 
@@ -565,6 +605,9 @@
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelector(`.tab[onclick="switchTab('${tabName}')"]`).classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
+            if (tabName === 'history') {
+                refreshHistory();
+            }
         }
 
         // ========== 变更管理 ==========
@@ -1029,6 +1072,96 @@
             } catch (e) {
                 alert('删除失败: ' + e.message);
             }
+        }
+
+        // ========== 变更历史 ==========
+
+        let currentCommitHash = null;
+
+        async function refreshHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                renderHistory(data);
+            } catch (e) {
+                addLog('ERROR', '获取历史失败: ' + e.message);
+            }
+        }
+
+        function renderHistory(data) {
+            const container = document.getElementById('history-container');
+
+            if (!data.commits || data.commits.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无提交历史</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="changes-list">
+                    ${data.commits.map(c => `
+                        <div class="change-item" onclick="showCommitDetail('${c.hash}')">
+                            <span class="change-name" style="flex: 1;">${escapeHtml(c.message)}</span>
+                            <span class="config-type">${c.short_hash}</span>
+                        </div>
+                        ${c.files && c.files.length > 0 ? `
+                            <div style="padding: 5px 15px 10px 85px; color: #7f8c8d; font-size: 12px;">
+                                ${c.files.map(f => `<span style="margin-right: 10px;">📄 ${f.path.split('/').pop()}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function showCommitDetail(hash) {
+            currentCommitHash = hash;
+            const container = document.getElementById('history-detail');
+            container.innerHTML = '<div class="empty-state">加载中...</div>';
+
+            try {
+                const res = await fetch(`/api/history/${hash}`);
+                const data = await res.json();
+
+                let filesHtml = '';
+                if (data.files && data.files.length > 0) {
+                    filesHtml = data.files.map(f => `<div style="margin-bottom: 5px;">📄 ${f.path}</div>`).join('');
+                }
+
+                container.innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>${escapeHtml(data.message || 'No message')}</strong>
+                        <div style="color: #7f8c8d; font-size: 12px; margin-top: 5px;">
+                            ${data.author || 'Unknown'} @ ${data.hash?.substring(0, 8) || hash}
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 10px; color: #7f8c8d;">变更文件:</div>
+                    ${filesHtml || '<div style="color: #7f8c8d;">无</div>'}
+                    <div style="margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px;">
+                        <pre id="diff-output" style="white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #f8f9fa; padding: 10px; border-radius: 4px; line-height: 1.5;">${escapeHtml(data.diff || 'No diff')}</pre>
+                    </div>
+                `;
+
+                // 高亮 diff
+                colorizeDiff();
+            } catch (e) {
+                container.innerHTML = `<div class="empty-state">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        function colorizeDiff() {
+            const diffOutput = document.getElementById('diff-output');
+            if (!diffOutput) return;
+
+            let html = diffOutput.textContent;
+            html = html.replace(/^(\+.*)$/gm, '<span style="color: #27ae60; background: #d4edda;">$1</span>');
+            html = html.replace(/^(\-.*)$/gm, '<span style="color: #e74c3c; background: #f8d7da;">$1</span>');
+            html = html.replace(/^(@@.*@@)$/gm, '<span style="color: #3498db; font-weight: bold;">$1</span>');
+            html = html.replace(/^(diff --git.*)$/gm, '<span style="color: #9b59b6;">$1</span>');
+            html = html.replace(/^(index.*)$/gm, '<span style="color: #7f8c8d;">$1</span>');
+            html = html.replace(/^(--- .*)$/gm, '<span style="color: #e74c3c;">$1</span>');
+            html = html.replace(/^(\+\+\+ .*)$/gm, '<span style="color: #27ae60;">$1</span>');
+
+            diffOutput.innerHTML = html;
         }
 
         // ========== 日志 ==========

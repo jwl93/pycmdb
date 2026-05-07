@@ -314,6 +314,130 @@ def api_all_configs():
     return jsonify({"configs": configs})
 
 
+@app.route("/api/history")
+def api_history():
+    """
+    获取 git 提交历史（只显示涉及 publish/ 或 hooks/ 的提交）
+    """
+    try:
+        # 先获取所有提交哈希
+        log_result = subprocess.run(
+            ["git", "log", "--format=%H %s", "-100"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if log_result.returncode != 0:
+            return jsonify({"error": "git log failed"}), 500
+
+        commits = []
+        for line in log_result.stdout.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split(" ", 1)
+            if len(parts) != 2:
+                continue
+            commit_hash = parts[0]
+            commit_msg = parts[1]
+
+            # 检查这个提交是否涉及 publish/ 或 hooks/
+            stat_result = subprocess.run(
+                ["git", "diff-tree", "--no-commit-id", "--stat", "-r", commit_hash],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            has_relevant_files = False
+            files = []
+            for stat_line in stat_result.stdout.splitlines():
+                # stat_line 格式: path | X insertions(+), Y deletions(-)
+                stat_line = stat_line.strip()
+                if not stat_line:
+                    continue
+                if "\t" in stat_line:
+                    file_path = stat_line.split("\t")[0]
+                else:
+                    file_path = stat_line.split(" ")[0]
+
+                if file_path.startswith("publish/") or file_path.startswith("hooks/"):
+                    has_relevant_files = True
+                    files.append({"path": file_path, "changes": stat_line})
+
+            # 只保留有相关文件的提交
+            if has_relevant_files:
+                commits.append({
+                    "hash": commit_hash,
+                    "short_hash": commit_hash[:8],
+                    "message": commit_msg,
+                    "author": "CMDB",
+                    "date": "",
+                    "files": files
+                })
+
+            # 限制数量
+            if len(commits) >= 50:
+                break
+
+        return jsonify({"commits": commits})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history/<commit_hash>")
+def api_history_detail(commit_hash: str):
+    """
+    获取某次提交的详细变更（含 diff）
+    """
+    try:
+        # 获取提交信息
+        show_result = subprocess.run(
+            ["git", "show", "--stat", commit_hash],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        # 获取详细 diff
+        diff_result = subprocess.run(
+            ["git", "diff", f"{commit_hash}~1..{commit_hash}"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if show_result.returncode != 0:
+            return jsonify({"error": "git show failed"}), 500
+
+        # 解析 show 输出
+        lines = show_result.stdout.splitlines()
+        info = {"hash": commit_hash, "message": "", "files": [], "diff": diff_result.stdout}
+
+        # 提取提交信息
+        for i, line in enumerate(lines):
+            if line.startswith("commit "):
+                info["hash"] = line.split("commit ")[1]
+            elif line.startswith("Author:"):
+                info["author"] = line.split("Author:")[1].strip()
+            elif line.startswith("Date:"):
+                info["date"] = line.split("Date:")[1].strip()
+            elif line and not line.startswith(" ") and not line.startswith("commit") and "Author:" not in line and "Date:" not in line:
+                if not any(x in line for x in ["changed", "insertions", "deletions"]):
+                    info["message"] = line.strip()
+
+        # 解析文件变更
+        in_files_section = False
+        for line in lines:
+            if "changed" in line or "insertions" in line or "deletions" in line:
+                in_files_section = True
+            if line.strip().startswith("publish/") or line.strip().startswith("hooks/"):
+                info["files"].append({"path": line.strip(), "changes": ""})
+
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/logs")
 def api_logs():
     """获取日志流"""
