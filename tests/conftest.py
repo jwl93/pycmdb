@@ -34,7 +34,7 @@ def schema_dir(cmdb_root):
 def sample_host(schema_dir):
     """Create sample host config web-01."""
     host_file = schema_dir / "publish" / "hosts" / "config" / "web-01"
-    host_file.write_text("hostname: web-01\nip: 10.0.0.1\n")
+    host_file.write_text("name: web-01\nip: 10.0.0.1\n")
     return host_file
 
 @pytest.fixture

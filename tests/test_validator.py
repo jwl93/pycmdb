@@ -10,10 +10,10 @@ def test_validate_config_valid(schema_dir, monkeypatch):
     """Valid host config should pass validation."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
 
-    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    data = {"name": "web-01", "ip": "10.0.0.1"}
     result = validate_config(ConfigType.HOSTS, "web-01", data)
 
-    assert result["hostname"] == "web-01"
+    assert result["name"] == "web-01"
     assert result["ip"] == "10.0.0.1"
 
 
@@ -21,7 +21,7 @@ def test_validate_config_invalid(schema_dir, monkeypatch):
     """Invalid config (wrong ip format) should fail schema validation."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
 
-    data = {"hostname": "web-01", "ip": "not-an-ip"}
+    data = {"name": "web-01", "ip": "not-an-ip"}
 
     with pytest.raises(ValidationError) as exc_info:
         validate_config(ConfigType.HOSTS, "web-01", data)
@@ -33,8 +33,8 @@ def test_merge_defaults(schema_dir, monkeypatch):
     """Default values should be merged into config."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
 
-    # Only provide hostname and ip, defaults should be merged
-    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    # Only provide name and ip, defaults should be merged
+    data = {"name": "web-01", "ip": "10.0.0.1"}
     result = validate_config(ConfigType.HOSTS, "web-01", data)
 
     # Check that defaults are merged
@@ -116,7 +116,7 @@ def test_validate_change_new(cmdb_root, monkeypatch, schema_dir, sample_host):
 
     # Write the config file
     (cmdb_root / "publish" / "hosts" / "config" / "web-02").write_text(
-        "hostname: web-02\nip:  10.0.0.2\n"
+        "name: web-02\nip:  10.0.0.2\n"
     )
 
     valid, errors = validate_change(change)
@@ -125,20 +125,20 @@ def test_validate_change_new(cmdb_root, monkeypatch, schema_dir, sample_host):
 
 
 def test_business_rules_hostname_match(schema_dir, monkeypatch):
-    """Hostname matches filename, should pass."""
+    """Name matches filename, should pass."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
 
-    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    data = {"name": "web-01", "ip": "10.0.0.1"}
     errors = validate_business_rules(ConfigType.HOSTS, "web-01", data)
 
     assert errors == []
 
 
 def test_business_rules_hostname_mismatch(schema_dir, monkeypatch):
-    """Hostname does not match filename, should return error."""
+    """Name does not match filename, should return error."""
     monkeypatch.setenv("CMDB_ROOT", str(schema_dir))
 
-    data = {"hostname": "web-01", "ip": "10.0.0.1"}
+    data = {"name": "web-01", "ip": "10.0.0.1"}
     errors = validate_business_rules(ConfigType.HOSTS, "web-02", data)
 
     assert len(errors) == 1

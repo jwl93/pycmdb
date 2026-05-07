@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["hostname", "ip"],
+  "required": ["name", "ip"],
   "properties": {
-    "hostname": {
+    "name": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]+$",
       "examples": ["web-01", "db-primary"]

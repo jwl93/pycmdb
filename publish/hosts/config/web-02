@@ -1,4 +1,4 @@
-hostname: web-02
+name: web-02
 ip: 10.0.1.2
 host_group:
   - web

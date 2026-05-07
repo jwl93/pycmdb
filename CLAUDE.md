@@ -116,7 +116,21 @@ pycmdb/
 
 ### 命名规范
 
-- **hostname/name**: 小写字母开头，只含 `a-z0-9-`
+所有配置的 `name` 字段必须与文件名一致（无扩展名）：
+
+```yaml
+# hosts/web-01
+name: web-01        # 必须与文件名一致
+ip: 10.0.1.1
+
+# host_groups/web
+name: web           # 必须与文件名一致
+
+# services/api-gateway
+name: api-gateway   # 必须与文件名一致
+```
+
+- **name/hostname**: 小写字母开头，只含 `a-z0-9-`
 - **version**: 语义化版本 `x.y.z`
 
 ### 部署锁

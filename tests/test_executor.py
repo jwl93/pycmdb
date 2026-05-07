@@ -117,7 +117,7 @@ def run(context):
         name="web-01",
     )
 
-    result = execute_hook(change, None, {"hostname": "web-01"}, dry_run=True)
+    result = execute_hook(change, None, {"name": "web-01"}, dry_run=True)
 
     assert result is True
     captured = capsys.readouterr()
@@ -134,7 +134,7 @@ def test_execute_hook_no_hook(cmdb_root, monkeypatch, capsys):
         name="web-01",
     )
 
-    result = execute_hook(change, None, {"hostname": "web-01"}, dry_run=False)
+    result = execute_hook(change, None, {"name": "web-01"}, dry_run=False)
 
     assert result is True
     captured = capsys.readouterr()
@@ -159,7 +159,7 @@ def run(context):
         name="web-01",
     )
 
-    result = execute_hook(change, None, {"hostname": "web-01"}, dry_run=False)
+    result = execute_hook(change, None, {"name": "web-01"}, dry_run=False)
 
     assert result is True
     captured = capsys.readouterr()
@@ -186,10 +186,10 @@ def run(context):
     # Create config files
     host_new = cmdb_root / "publish" / "hosts" / "config" / "web-02"
     host_new.parent.mkdir(parents=True, exist_ok=True)
-    host_new.write_text("hostname: web-02\nip: 10.0.0.2\n")
+    host_new.write_text("name: web-02\nip: 10.0.0.2\n")
 
     host_existing = cmdb_root / "publish" / "hosts" / "config" / "web-01"
-    host_existing.write_text("hostname: web-01\nip: 10.0.0.1\n")
+    host_existing.write_text("name: web-01\nip: 10.0.0.1\n")
 
     changes = [
         Change(
@@ -224,12 +224,11 @@ def test_build_context():
         name="web-01",
     )
 
-    context = build_context(change, None, {"hostname": "web-01", "ip": "10.0.0.1"})
+    context = build_context(change, None, {"name": "web-01", "ip": "10.0.0.1"})
 
     assert context["change_type"] == "new"
     assert context["config_type"] == "hosts"
     assert context["name"] == "web-01"
-    assert context["hostname"] == "web-01"
     assert "new" in context
 
 
@@ -247,7 +246,7 @@ def run(context):
     # Create config file
     host_new = cmdb_root / "publish" / "hosts" / "config" / "web-03"
     host_new.parent.mkdir(parents=True, exist_ok=True)
-    host_new.write_text("hostname: web-03\nip: 10.0.0.3\n")
+    host_new.write_text("name: web-03\nip: 10.0.0.3\n")
 
     change = Change(
         config_type=ConfigType.HOSTS,

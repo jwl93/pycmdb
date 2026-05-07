@@ -101,7 +101,7 @@ def build_context(change: Change, old_data: Optional[dict], new_data: Optional[d
 
     # hosts 相关上下文
     if change.config_type == ConfigType.HOSTS:
-        context["hostname"] = new_data.get("hostname") if new_data else (old_data.get("hostname") if old_data else change.name)
+        context["name"] = new_data.get("name") if new_data else (old_data.get("name") if old_data else change.name)
 
     # services 相关上下文
     elif change.config_type == ConfigType.SERVICES:

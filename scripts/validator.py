@@ -156,6 +156,7 @@ def get_hosts_in_group(group_name: str) -> list[str]:
 def validate_business_rules(config_type: ConfigType, name: str, data: dict) -> list[str]:
     """
     业务规则校验
+    所有配置类型的 name 字段必须与文件名一致
     返回错误列表，空列表表示校验通过
     """
     errors = []
@@ -163,20 +164,9 @@ def validate_business_rules(config_type: ConfigType, name: str, data: dict) -> l
     if not data:
         return errors
 
-    if config_type == ConfigType.HOSTS:
-        hostname = data.get("hostname", "")
-        if hostname and name != hostname:
-            errors.append(f"文件名 {name} 与 hostname {hostname} 不匹配")
-
-    elif config_type == ConfigType.HOST_GROUPS:
-        group_name = data.get("name", "")
-        if group_name and name != group_name:
-            errors.append(f"文件名 {name} 与 name {group_name} 不匹配")
-
-    elif config_type == ConfigType.SERVICES:
-        svc_name = data.get("name", "")
-        if svc_name and name != svc_name:
-            errors.append(f"文件名 {name} 与 name {svc_name} 不匹配")
+    config_name = data.get("name", "")
+    if config_name and name != config_name:
+        errors.append(f"文件名 {name} 与 name {config_name} 不匹配")
 
     return errors
 
