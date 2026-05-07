@@ -16,32 +16,33 @@
             color: #333;
         }
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 10px 15px;
+            padding: 10px 20px;
         }
         .split-layout {
             display: flex;
             gap: 15px;
-            height: calc(100vh - 150px);
         }
         .main-panel {
             flex: 2;
             display: flex;
             flex-direction: column;
             gap: 15px;
-            overflow: auto;
         }
         .logs-panel {
             flex: 1;
-            min-width: 280px;
+            min-width: 300px;
+            max-width: 400px;
         }
         .logs-panel .card {
             height: 100%;
             margin: 0;
+            display: flex;
+            flex-direction: column;
         }
         .logs-panel .card-body {
-            height: calc(100% - 50px);
+            flex: 1;
             overflow-y: auto;
         }
         header {
