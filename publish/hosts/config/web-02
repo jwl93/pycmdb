@@ -3,7 +3,7 @@ ip: 10.0.1.2
 host_group:
   - web
 ssh:
-  port: 22
+  port: 23
   user: deploy
 labels:
   environment: production
