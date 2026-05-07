@@ -1,2 +1,4 @@
 hostname: web-03
 ip: 10.0.0.10
+host_group:
+  - web
