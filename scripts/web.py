@@ -417,6 +417,84 @@ def api_file_validate(file_path: str):
     })
 
 
+@app.route("/api/files", methods=["POST"])
+def api_file_create():
+    """
+    在指定目录下创建新文件
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "缺少请求数据"}), 400
+
+    config_type = data.get("config_type")
+    name = data.get("name")
+    content = data.get("content", "")
+
+    if not config_type or not name:
+        return jsonify({"error": "缺少 config_type 或 name"}), 400
+
+    # 验证 config_type
+    if config_type not in ["hosts", "host_groups", "services"]:
+        return jsonify({"error": "无效的 config_type"}), 400
+
+    file_path = root / "publish" / config_type / "config" / name
+
+    # 安全检查
+    try:
+        file_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    # 检查文件是否已存在
+    if file_path.exists():
+        return jsonify({"error": f"文件已存在: {name}"}), 409
+
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(file_path, "w") as f:
+            f.write(content)
+
+        add_log("INFO", f"文件已创建: {config_type}/config/{name}")
+
+        return jsonify({"success": True, "path": f"{config_type}/config/{name}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/files/<path:file_path>", methods=["DELETE"])
+def api_file_delete(file_path: str):
+    """
+    删除文件
+    """
+    from scripts import get_cmdb_root
+
+    root = get_cmdb_root()
+    file_full_path = root / "publish" / file_path
+
+    # 安全检查
+    try:
+        file_full_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return jsonify({"error": "非法路径"}), 400
+
+    if not file_full_path.exists():
+        return jsonify({"error": "文件不存在"}), 404
+
+    if not file_full_path.is_file():
+        return jsonify({"error": "不是文件"}), 400
+
+    try:
+        file_full_path.unlink()
+        add_log("INFO", f"文件已删除: {file_path}")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 def main():
     port = int(os.environ.get("PORT", 5000))
     add_log("INFO", f"CMDB Web 服务启动在 http://localhost:{port}")

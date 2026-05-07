@@ -416,13 +416,44 @@
             <div class="card">
                 <div class="card-header">
                     <span>📂 配置文件</span>
-                    <button class="btn btn-primary" onclick="refreshFiles()">🔄 刷新</button>
+                    <div>
+                        <button class="btn btn-success" onclick="showNewFileModal()">➕ 新建文件</button>
+                        <button class="btn btn-primary" onclick="refreshFiles()">🔄 刷新</button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="file-tree" id="file-tree">
                         <div class="empty-state">加载中...</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建文件 Modal -->
+    <div class="modal" id="newfile-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ 新建配置文件</h3>
+                <button class="modal-close" onclick="closeNewFileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">配置类型</label>
+                    <select id="newfile-type" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="hosts">hosts</option>
+                        <option value="host_groups">host_groups</option>
+                        <option value="services">services</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">文件名（无扩展名）</label>
+                    <input type="text" id="newfile-name" placeholder="如 web-03" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="createFile()">创建</button>
+                <button class="btn" onclick="closeNewFileModal()">取消</button>
             </div>
         </div>
     </div>
@@ -595,9 +626,10 @@
                 `;
                 for (const file of (configType.children || [])) {
                     html += `
-                        <div class="tree-item" onclick="openFileEditor('${file.path}')">
-                            <span class="icon">📄</span>
-                            <span class="name">${file.name}</span>
+                        <div class="tree-item">
+                            <span class="icon" style="cursor: pointer;" onclick="openFileEditor('${file.path}')">📄</span>
+                            <span class="name" style="cursor: pointer; flex: 1;" onclick="openFileEditor('${file.path}')">${file.name}</span>
+                            <button class="btn btn-danger" style="padding: 3px 8px; font-size: 12px;" onclick="event.stopPropagation(); deleteFile('${file.path}')">🗑️</button>
                         </div>
                     `;
                 }
@@ -685,6 +717,77 @@
                 }
             } catch (e) {
                 validateEl.innerHTML = `<div class="validate-result invalid">❌ 保存失败: ${e.message}</div>`;
+            }
+        }
+
+        // ========== 新建文件 ==========
+
+        function showNewFileModal() {
+            document.getElementById('newfile-modal').classList.add('active');
+            document.getElementById('newfile-name').value = '';
+        }
+
+        function closeNewFileModal() {
+            document.getElementById('newfile-modal').classList.remove('active');
+        }
+
+        async function createFile() {
+            const configType = document.getElementById('newfile-type').value;
+            const name = document.getElementById('newfile-name').value.trim();
+
+            if (!name) {
+                alert('请输入文件名');
+                return;
+            }
+
+            // 简单验证文件名格式
+            if (!/^[a-z][a-z0-9-]*$/.test(name)) {
+                alert('文件名必须以小写字母开头，只能包含小写字母、数字和连字符');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/files', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({config_type: configType, name: name, content: ''})
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    addLog('INFO', `文件已创建: ${data.path}`);
+                    closeNewFileModal();
+                    refreshFiles();
+                    // 自动打开编辑
+                    openFileEditor(data.path);
+                } else {
+                    alert('创建失败: ' + data.error);
+                }
+            } catch (e) {
+                alert('创建失败: ' + e.message);
+            }
+        }
+
+        // ========== 删除文件 ==========
+
+        async function deleteFile(path) {
+            if (!confirm(`确认删除文件 ${path}？`)) return;
+
+            try {
+                const res = await fetch(`/api/files/${path}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    addLog('INFO', `文件已删除: ${path}`);
+                    refreshFiles();
+                    refreshChanges();
+                } else {
+                    alert('删除失败: ' + data.error);
+                }
+            } catch (e) {
+                alert('删除失败: ' + e.message);
             }
         }
 
