@@ -73,7 +73,18 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
     if not data:
         return errors
 
-    if change.config_type == ConfigType.SERVICES:
+    if change.config_type == ConfigType.HOSTS:
+        # 检查 host_group 引用
+        host_groups = data.get("host_group", [])
+        if isinstance(host_groups, list):
+            for group in host_groups:
+                if not _host_group_exists(group):
+                    errors.append(f"引用的 host_group 不存在: {group}")
+        elif host_groups:
+            if not _host_group_exists(host_groups):
+                errors.append(f"引用的 host_group 不存在: {host_groups}")
+
+    elif change.config_type == ConfigType.SERVICES:
         # 检查 hosts 和 host_groups 引用
         hosts_refs = data.get("hosts", [])
         for ref in hosts_refs:
@@ -86,6 +97,13 @@ def validate_references(change: Change, data: Optional[dict]) -> list[str]:
         pass
 
     return errors
+
+
+def _host_group_exists(group_name: str) -> bool:
+    """检查 host_group 是否存在"""
+    root = get_cmdb_root()
+    path = root / "publish" / "host_groups" / "config" / group_name
+    return path.exists()
 
 
 def _resolve_ref(ref: str) -> Optional[Path]:
