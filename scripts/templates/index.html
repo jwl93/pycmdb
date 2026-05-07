@@ -583,7 +583,11 @@
                     addLog('INFO', `部署完成: ${data.results.success} 成功`);
                     refreshChanges();
                 } else {
-                    addLog('ERROR', '部署失败: ' + data.error);
+                    let msg = '部署失败: ' + data.error;
+                    if (data.details && data.details.length > 0) {
+                        msg += '\n' + data.details.map(e => '  - ' + e).join('\n');
+                    }
+                    addLog('ERROR', msg);
                 }
             } catch (e) {
                 addLog('ERROR', '部署失败: ' + e.message);
